@@ -1,0 +1,39 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# next
+.next/
+out/
+build/
+next-env.d.ts
+
+# env
+.env
+.env.local
+.env.*.local
+
+# tooling caches
+.npm-cache/
+.tmp/
+.preview/
+.chrome-profile/
+*.tsbuildinfo
+
+# local postgres cluster used by scripts/dev-db.ps1
+.pgdata/
+
+# runtime data (demo JSON store / local uploads)
+.data/
+public/uploads/
+
+# prisma
+prisma/dev.db
+prisma/dev.db-journal
+
+# misc
+.DS_Store
+Thumbs.db
+*.log
+.vercel
