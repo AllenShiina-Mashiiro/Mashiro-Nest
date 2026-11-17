@@ -2,6 +2,9 @@ import type { Metadata, Viewport } from "next";
 import { siteConfig } from "@/lib/config";
 import "./globals.css";
 
+// All site pages depend on live PostgreSQL data; do not prerender database reads during build.
+export const dynamic = "force-dynamic";
+
 const themeScript = `
 (function() {
   try {
