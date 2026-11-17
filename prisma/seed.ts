@@ -1,5 +1,4 @@
 import { PrismaClient } from "@prisma/client";
-import { hash } from "bcryptjs";
 import fs from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
@@ -49,36 +48,13 @@ function readPosts() {
 }
 
 async function main() {
-  const email = process.env.ADMIN_EMAIL?.trim().toLowerCase() || (process.env.NODE_ENV === "production" ? "" : "admin@mizuki.dev");
-  const username = process.env.ADMIN_USERNAME ?? "AllenShiina";
-  const password = process.env.ADMIN_PASSWORD || (process.env.NODE_ENV === "production" ? "" : "mizuki");
-  if (process.env.NODE_ENV === "production" && !email) {
-    throw new Error("ADMIN_EMAIL_REQUIRED: set ADMIN_EMAIL before running the production seed");
-  }
-  if (process.env.NODE_ENV === "production" && password.length < 12) {
-    throw new Error("ADMIN_PASSWORD_REQUIRED: production administrator passwords must be at least 12 characters");
-  }
-  if (!password) {
-    throw new Error("ADMIN_PASSWORD_REQUIRED: set ADMIN_PASSWORD before running the production seed");
+  const email = (process.env.ADMIN_EMAIL?.trim() || "admin@mashiro.dev").toLowerCase();
+  const author = await prisma.user.findUnique({ where: { email } });
+  if (!author || author.role !== "ADMIN") {
+    throw new Error("ADMIN_NOT_INITIALIZED: create the administrator first with npm run db:admin");
   }
 
-  console.log("→ seeding admin user");
-  const author = await prisma.user.upsert({
-    where: { email },
-    update: { role: "ADMIN" },
-    create: {
-      email,
-      username,
-      displayName: process.env.ADMIN_NAME ?? "AllenShiina",
-      passwordHash: await hash(password, 10),
-      role: "ADMIN",
-      bio: "白天写前端，晚上写博客。",
-      status: "写代码中",
-      location: "重庆",
-      avatarUrl: "/images/avatar.svg",
-      github: "https://github.com/",
-    },
-  });
+  console.log(`→ using administrator: ${email}`);
 
   const posts = readPosts();
   console.log(`→ seeding ${posts.length} posts`);
