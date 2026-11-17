@@ -57,6 +57,8 @@ export type SiteSettings = {
   heroImages: string[];
   /** Diagonal light beam + split line over the hero. */
   heroBeam: boolean;
+  /** 主视觉轮换间隔（分钟）：1 / 5 / 20 / 60 / 1440 */
+  heroRotateMinutes: number;
 
   aboutTitle: string;
   aboutContent: string;
@@ -83,6 +85,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   heroSubtitle: "Mashiro Nest · 记录代码与樱花",
   heroImages: ["/images/banner.svg"],
   heroBeam: true,
+  heroRotateMinutes: 1440,
 
   aboutTitle: "关于",
   aboutContent: "",

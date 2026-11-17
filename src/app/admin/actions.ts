@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getSession, type SessionUser } from "@/lib/auth";
 import { cacheDel, invalidateContent } from "@/lib/cache";
 import { colorFor, slugifyTag } from "@/lib/text";
+import { normalizeHeroRotate } from "@/lib/hero";
 import {
   deleteAnime,
   deleteFriend,
@@ -243,6 +244,9 @@ export async function saveSettingsAction(formData: FormData): Promise<void> {
     .filter(Boolean);
   if (heroImages.length) patch.heroImages = heroImages;
   patch.heroBeam = formData.get("heroBeam") === "on";
+  patch.heroRotateMinutes = normalizeHeroRotate(
+    Number(formData.get("heroRotateMinutes") ?? 1440),
+  );
 
   const musicVolume = Number(formData.get("musicVolume") ?? 0.7);
   patch.music = {

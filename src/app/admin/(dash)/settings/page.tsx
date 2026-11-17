@@ -8,6 +8,7 @@ import { MultiMediaField } from "@/components/admin/multi-media-field";
 import { StatusPicker } from "@/components/admin/status-picker";
 import { getPage, getSettings, listUsers } from "@/lib/data";
 import { listLive2dModels } from "@/lib/live2d-models";
+import { HERO_ROTATE_LABELS, HERO_ROTATE_OPTIONS } from "@/lib/hero";
 
 export const dynamic = "force-dynamic";
 
@@ -159,10 +160,27 @@ export default async function SettingsPage({
           </label>
           <MultiMediaField
             name="heroImages"
-            label="首页背景图（按天轮换）"
+            label="首页背景图（多张时按时长轮换）"
             defaultValue={settings.heroImages.join("\n")}
-            hint="从媒体库选图或上传；第一张是主图，可调整顺序。"
+            hint="从媒体库选图或上传；列表顺序就是轮换顺序。"
           />
+          <label className="block">
+            <span className="mb-1 block text-[11px] font-semibold text-ink-400">背景轮换间隔</span>
+            <select
+              name="heroRotateMinutes"
+              defaultValue={String(settings.heroRotateMinutes)}
+              className="w-full rounded-xl border border-ink-200/80 bg-white/70 px-2.5 py-2 text-[11.5px] outline-none focus:border-mint-300 dark:border-white/10 dark:bg-white/5 dark:text-white/90"
+            >
+              {HERO_ROTATE_OPTIONS.map((minutes) => (
+                <option key={minutes} value={minutes}>
+                  {HERO_ROTATE_LABELS[minutes] ?? `每 ${minutes} 分钟`}
+                </option>
+              ))}
+            </select>
+            <span className="mt-1 block text-[10.5px] leading-relaxed text-ink-400">
+              同一时间段内全站用同一张图；页面开着时会到点自动换，不用刷新。
+            </span>
+          </label>
           <label className="flex items-center gap-2 text-[11.5px] text-ink-500 dark:text-ink-300">
             <input
               type="checkbox"

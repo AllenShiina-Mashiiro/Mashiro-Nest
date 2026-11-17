@@ -7,6 +7,7 @@ import { PostCard } from "@/components/post-card";
 import { Sidebar } from "@/components/sidebar";
 import { getCategories, getPosts, getSettings, getStats, getTags, listUsers } from "@/lib/data";
 import { siteConfig } from "@/lib/config";
+import { pickHeroImage } from "@/lib/hero";
 import { paginate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +31,7 @@ export default async function HomePage({
 
   const owner = users.find((user) => user.role === "ADMIN") ?? users[0] ?? null;
   const images = settings.heroImages?.length ? settings.heroImages : ["/images/banner.svg"];
-  const heroImage = images[Math.floor(Date.now() / 86_400_000) % images.length];
+  const heroImage = pickHeroImage(images, settings.heroRotateMinutes);
 
   const { items, page, totalPages, total } = paginate(
     posts,
@@ -44,6 +45,8 @@ export default async function HomePage({
         title={settings.heroTitle || settings.siteName}
         subtitle={settings.heroSubtitle || settings.siteSubtitle}
         image={heroImage}
+        images={images}
+        rotateMinutes={settings.heroRotateMinutes}
         beam={settings.heroBeam}
       />
 

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HeroImage } from "@/components/hero-image";
 
 /**
  * 首页 / 关于页的主视觉：图片 + 顶部压暗 + 底部渐隐 + 斜切光束（还原原主题的
@@ -8,12 +9,18 @@ export function Hero({
   title,
   subtitle,
   image,
+  images = [],
+  rotateMinutes = 1440,
   beam = true,
   compact = false,
 }: {
   title: string;
   subtitle: string;
   image: string;
+  /** 候选图列表；传了 2 张以上才会自动轮换 */
+  images?: string[];
+  /** 轮换间隔（分钟） */
+  rotateMinutes?: number;
   beam?: boolean;
   compact?: boolean;
 }) {
@@ -23,12 +30,11 @@ export function Hero({
         compact ? "h-[300px] sm:h-[340px]" : "h-[460px] sm:h-[560px] lg:h-[600px]"
       }`}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={image}
-        alt=""
-        aria-hidden="true"
-        className="absolute inset-0 h-full w-full scale-105 object-cover object-center saturate-[1.12]"
+      <HeroImage
+        images={images.length ? images : [image]}
+        initial={image}
+        rotateMinutes={rotateMinutes}
+        className="absolute inset-0 h-full w-full scale-105 object-cover object-center saturate-[1.12] transition-opacity duration-700"
       />
 
       <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(20,18,36,0.52),rgba(20,18,36,0.06)_26%,transparent_46%)]" />

@@ -6,6 +6,7 @@ import { ProfileCard } from "@/components/profile-card";
 import { getPage, getSettings, getStats, listUsers } from "@/lib/data";
 import { renderMarkdown } from "@/lib/markdown";
 import { visitorLocation } from "@/lib/geo";
+import { pickHeroImage } from "@/lib/hero";
 import { formatDate, formatNumber } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +40,7 @@ export default async function AboutPage() {
   // 位置优先用后台填的，没填就按访问者 IP 归属地显示（失败则留空）。
   const location = owner?.location?.trim() || visitor;
   const images = settings.heroImages?.length ? settings.heroImages : ["/images/banner.svg"];
-  const heroImage = images[Math.floor(Date.now() / 86_400_000) % images.length];
+  const heroImage = pickHeroImage(images, settings.heroRotateMinutes);
 
   return (
     <>
@@ -47,6 +48,8 @@ export default async function AboutPage() {
         title={settings.aboutTitle || "关于"}
         subtitle={settings.siteName}
         image={heroImage}
+        images={images}
+        rotateMinutes={settings.heroRotateMinutes}
         beam={settings.heroBeam}
         compact
       />
