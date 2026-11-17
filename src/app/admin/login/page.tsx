@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, Database } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { LoginForm } from "@/components/auth-forms";
-import { demoCredentials, getSession } from "@/lib/auth";
-import { getSettings, isDemoMode } from "@/lib/data";
+import { getSession } from "@/lib/auth";
+import { getSettings } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +17,7 @@ export default async function LoginPage() {
   const session = await getSession();
   if (session) redirect("/admin");
 
-  const [demo, settings] = await Promise.all([isDemoMode(), getSettings()]);
-  const credentials = demoCredentials();
+  const settings = await getSettings();
 
   return (
     <div className="grid min-h-dvh lg:grid-cols-[1.05fr_1fr]">
@@ -74,9 +73,6 @@ export default async function LoginPage() {
           <div className="mt-6">
             <LoginForm
               redirectTo="/admin"
-              demo={demo}
-              demoEmail={demo ? credentials.email : undefined}
-              demoPassword={demo ? credentials.password : undefined}
             />
           </div>
 
@@ -87,12 +83,6 @@ export default async function LoginPage() {
             </Link>
           </p>
 
-          {demo ? (
-            <p className="mt-5 flex items-start gap-2 rounded-xl border border-dashed border-ink-200/80 p-3 text-[10.5px] leading-relaxed text-ink-400 dark:border-white/10">
-              <Database className="mt-0.5 h-3 w-3 shrink-0" />
-              当前未检测到 DATABASE_URL，站点运行在本地 JSON 演示模式，所有改动会写入 `.data/store.json`。
-            </p>
-          ) : null}
         </div>
       </main>
     </div>
