@@ -41,7 +41,7 @@ Mashiro Nest 是一个基于 Next.js App Router 的多用户博客项目，包�
 | 缓存 | Redis（可选） |
 | 文件 | 本地磁盘或 S3 兼容对象存储 |
 
-- Node.js 20.x 或更新的受支持 LTS 版本
+- Node.js 22.x LTS（推荐）或更新的受支持 LTS 版本
 - npm（使用仓库中的 `package-lock.json`）
 - Docker Engine + Docker Compose（仅 Docker 部署需要）
 - PostgreSQL 16+（数据库模式需要）
