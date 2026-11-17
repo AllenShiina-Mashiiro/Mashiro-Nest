@@ -31,8 +31,8 @@ async function readUploadedFile(context: RouteContext) {
         part === "." ||
         part === ".." ||
         part.includes("/") ||
-        part.includes("\\\\") ||
-        part.includes("\\0"),
+        part.includes(String.fromCharCode(92)) ||
+        part.includes(String.fromCharCode(0)),
     )
   ) {
     return null;
