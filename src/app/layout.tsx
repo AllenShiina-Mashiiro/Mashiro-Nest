@@ -6,7 +6,7 @@ const themeScript = `
 (function() {
   try {
     var forced = new URLSearchParams(location.search).get('theme');
-    var stored = localStorage.getItem('mizuki-theme');
+    var stored = localStorage.getItem('mashiro-theme');
     var dark = forced === 'dark' || forced === 'light'
       ? forced === 'dark'
       : (stored ? stored === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches);
