@@ -42,10 +42,10 @@ export default async function LoginPage() {
               ADMIN CONSOLE
             </p>
             <h1 className="max-w-sm text-3xl font-bold leading-snug">
-              写作应该在浏览器里完成，而不是在编辑器里。
+              在这里创作与管理文章。
             </h1>
             <p className="mt-3 max-w-sm text-[12.5px] leading-relaxed text-white/70">
-              文章、标签、封面与发布状态都在这里管理。保存后前台缓存会立即失效。
+              编辑文章内容、设置标签和封面，并管理发布状态。保存后，前台内容将自动更新。
             </p>
           </div>
 
