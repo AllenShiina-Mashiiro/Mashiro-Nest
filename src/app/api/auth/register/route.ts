@@ -40,17 +40,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "密码至少 6 位" }, { status: 400 });
   }
 
+  const adminEmail = (
+    process.env.ADMIN_EMAIL || (process.env.NODE_ENV !== "production" ? "admin@mizuki.dev" : "")
+  ).trim().toLowerCase();
+  const adminUsername = (process.env.ADMIN_USERNAME || "AllenShiina").trim().toLowerCase();
+  if ((adminEmail && email === adminEmail) || username === adminUsername) {
+    return NextResponse.json({ error: "该邮箱或用户名为站长账号预留" }, { status: 409 });
+  }
+
   const store = await storeInstance();
-  const [byEmail, byName, total] = await Promise.all([
+  const [byEmail, byName] = await Promise.all([
     store.getUserByEmail(email),
     store.getUserByUsername(username),
-    store.countUsers(),
   ]);
 
   if (byEmail) return NextResponse.json({ error: "这个邮箱已经注册过了" }, { status: 409 });
   if (byName) return NextResponse.json({ error: "这个用户名已被占用" }, { status: 409 });
 
-  const role = total === 0 ? "ADMIN" : "USER";
+  // Public registration must never grant administrator privileges. The first
+  // administrator is created by the configured bootstrap credentials or seed.
   let user: PublicUser;
   try {
     user = await store.createUser({
@@ -58,7 +66,7 @@ export async function POST(request: Request) {
       username,
       displayName,
       passwordHash: await hashPassword(password),
-      role,
+      role: "USER",
     });
   } catch {
     return NextResponse.json({ error: "注册失败，请稍后再试" }, { status: 500 });

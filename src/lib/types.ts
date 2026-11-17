@@ -137,6 +137,8 @@ export type MomentComment = {
   content: string;
   createdAt: string;
   author: PublicUser | null;
+  likeCount: number;
+  likedByMe: boolean;
 };
 
 export type Moment = {
@@ -151,13 +153,14 @@ export type Moment = {
   comments: MomentComment[];
 };
 
-export type NotificationType = "like" | "comment" | "follow";
+export type NotificationType = "like" | "comment" | "comment_like" | "follow";
 
 export type NotificationItem = {
   id: string;
   type: NotificationType;
   actor: PublicUser | null;
   momentId: string | null;
+  commentId?: string | null;
   preview: string | null;
   read: boolean;
   createdAt: string;
@@ -251,8 +254,9 @@ export type Store = {
   searchMoments(query: string, viewerId?: string): Promise<Moment[]>;
 
   toggleLike(momentId: string, userId: string): Promise<{ liked: boolean; count: number }>;
+  toggleCommentLike(commentId: string, userId: string): Promise<{ liked: boolean; count: number }>;
   addComment(momentId: string, userId: string, content: string): Promise<MomentComment>;
-  deleteComment(commentId: string, userId: string, isAdmin?: boolean): Promise<void>;
+  deleteComment(commentId: string, userId: string, isAdmin?: boolean): Promise<boolean>;
   updateComment(
     commentId: string,
     userId: string,

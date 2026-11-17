@@ -10,6 +10,7 @@ import { formatDate } from "@/lib/utils";
 const DOT: Record<string, string> = {
   like: "text-sakura-500",
   comment: "text-mint-500",
+  comment_like: "text-sakura-500",
   follow: "text-sky-500",
 };
 
@@ -130,12 +131,18 @@ export function NotificationBell({ initialUnread = 0 }: { initialUnread?: number
             ) : (
               items.map((item) => {
                 const Icon =
-                  item.type === "like" ? Heart : item.type === "comment" ? MessageCircle : UserPlus;
-                const href = item.momentId
-                  ? `/moments#moment-${item.momentId}`
-                  : item.type === "follow" && item.actor
-                    ? `/u/${item.actor.username}`
-                    : "/moments";
+                  item.type === "like" || item.type === "comment_like"
+                    ? Heart
+                    : item.type === "comment"
+                      ? MessageCircle
+                      : UserPlus;
+                const href = item.commentId
+                  ? `/moments#comment-${item.commentId}`
+                  : item.momentId
+                    ? `/moments#moment-${item.momentId}`
+                    : item.type === "follow" && item.actor
+                      ? `/u/${item.actor.username}`
+                      : "/moments";
                 return (
                   <Link
                     key={item.id}
@@ -153,6 +160,7 @@ export function NotificationBell({ initialUnread = 0 }: { initialUnread?: number
                         </span>
                         {item.type === "like" ? " 赞了你的动态" : null}
                         {item.type === "comment" ? " 评论了你的动态" : null}
+                        {item.type === "comment_like" ? " 赞了你的评论" : null}
                         {item.type === "follow" ? " 关注了你" : null}
                       </p>
                       {item.preview ? (

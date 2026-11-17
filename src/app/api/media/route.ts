@@ -43,8 +43,15 @@ export async function DELETE(request: Request) {
   const body = (await request.json().catch(() => ({}))) as { key?: string };
   if (!body.key) return NextResponse.json({ error: "缺少 key" }, { status: 400 });
 
-  const { deleteMediaByKey } = await import("@/lib/media");
-  await deleteMediaByKey(body.key);
-  const items = await listMedia();
-  return NextResponse.json({ ok: true, remaining: items.length });
+  const { deleteMediaByKey, MediaError } = await import("@/lib/media");
+  try {
+    await deleteMediaByKey(body.key);
+    const items = await listMedia();
+    return NextResponse.json({ ok: true, remaining: items.length });
+  } catch (error) {
+    if (error instanceof MediaError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    return NextResponse.json({ error: "删除媒体失败" }, { status: 500 });
+  }
 }

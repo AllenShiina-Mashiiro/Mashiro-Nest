@@ -99,6 +99,7 @@ type Db = {
   settings: Partial<SiteSettings>;
   likes: StoredLike[];
   comments: StoredComment[];
+  commentLikes: StoredCommentLike[];
   notifications: StoredNotification[];
 };
 
@@ -110,11 +111,12 @@ type StoredComment = {
   content: string;
   createdAt: string;
 };
+type StoredCommentLike = { commentId: string; userId: string; createdAt: string };
 type StoredNotification = {
   id: string;
   userId: string;
   actorId: string;
-  type: "like" | "comment" | "follow";
+  type: "like" | "comment" | "comment_like" | "follow";
   momentId: string | null;
   commentId: string | null;
   preview: string | null;
@@ -126,13 +128,24 @@ let db: Db | null = null;
 let writeChain: Promise<unknown> = Promise.resolve();
 
 function seedDb(): Db {
+  if (process.env.NODE_ENV === "production") {
+    if (!process.env.ADMIN_EMAIL?.trim()) {
+      throw new Error("ADMIN_EMAIL_REQUIRED: configure the administrator email before production startup");
+    }
+    if ((process.env.ADMIN_PASSWORD?.length ?? 0) < 12) {
+      throw new Error("ADMIN_PASSWORD_REQUIRED: production administrator passwords must be at least 12 characters");
+    }
+  }
   const now = new Date().toISOString();
   const admin: StoredUser = {
     id: "user-admin",
-    email: (process.env.ADMIN_EMAIL ?? "admin@mizuki.dev").toLowerCase(),
-    username: process.env.ADMIN_USERNAME ?? "AllenShiina",
-    displayName: process.env.ADMIN_NAME ?? "AllenShiina",
-    passwordHash: hashSync(process.env.ADMIN_PASSWORD ?? "mizuki", 10),
+    email: (
+      process.env.ADMIN_EMAIL?.trim() ||
+      (process.env.NODE_ENV === "production" ? "" : "admin@mizuki.dev")
+    ).toLowerCase(),
+    username: process.env.ADMIN_USERNAME?.trim() || "AllenShiina",
+    displayName: process.env.ADMIN_NAME?.trim() || "AllenShiina",
+    passwordHash: hashSync(process.env.ADMIN_PASSWORD || "mizuki", 10),
     role: "ADMIN",
     avatarUrl: "/images/avatar.svg",
     bannerUrl: null,
@@ -172,6 +185,7 @@ function seedDb(): Db {
     settings: {},
     likes: [],
     comments: [],
+    commentLikes: [],
     notifications: [],
   };
 }
@@ -185,6 +199,7 @@ function load(): Db {
     // 兼容老版本 store.json
     db.likes ??= [];
     db.comments ??= [];
+    db.commentLikes ??= [];
     db.notifications ??= [];
   } catch {
     db = seedDb();
@@ -258,6 +273,8 @@ function decorateMoment(data: Db, moment: StoredMoment, viewerId?: string): Mome
       content: comment.content,
       createdAt: comment.createdAt,
       author: authorOf(data, comment.authorId),
+      likeCount: data.commentLikes.filter((like) => like.commentId === comment.id).length,
+      likedByMe: Boolean(viewerId && data.commentLikes.some((like) => like.commentId === comment.id && like.userId === viewerId)),
     }));
 
   return {
@@ -481,6 +498,12 @@ export const demoStore: Store = {
 
     if (index >= 0) {
       data.likes.splice(index, 1);
+      data.notifications = data.notifications.filter(
+        (item) => !(item.type === "like" && item.momentId === momentId && item.actorId === userId),
+      );
+      publishToUser(moment.authorId, {
+        count: data.notifications.filter((item) => item.userId === moment.authorId && !item.read).length,
+      });
     } else {
       data.likes.push({ momentId, userId, createdAt: new Date().toISOString() });
       if (moment.authorId !== userId) {
@@ -549,24 +572,65 @@ export const demoStore: Store = {
       content: comment.content,
       createdAt: comment.createdAt,
       author: authorOf(data, userId),
+      likeCount: 0,
+      likedByMe: false,
     };
+  },
+
+  async toggleCommentLike(commentId, userId) {
+    const data = load();
+    const comment = data.comments.find((item) => item.id === commentId);
+    if (!comment) throw new Error("COMMENT_NOT_FOUND");
+    const index = data.commentLikes.findIndex((item) => item.commentId === commentId && item.userId === userId);
+    if (index >= 0) {
+      data.commentLikes.splice(index, 1);
+      data.notifications = data.notifications.filter(
+        (item) => !(item.type === "comment_like" && item.commentId === commentId && item.actorId === userId),
+      );
+    } else {
+      data.commentLikes.push({ commentId, userId, createdAt: new Date().toISOString() });
+      if (comment.authorId !== userId) {
+        data.notifications.unshift({
+          id: randomUUID(),
+          userId: comment.authorId,
+          actorId: userId,
+          type: "comment_like",
+          momentId: comment.momentId,
+          commentId,
+          preview: comment.content.slice(0, 60),
+          read: false,
+          createdAt: new Date().toISOString(),
+        });
+      }
+    }
+    publishToUser(comment.authorId, {
+      count: data.notifications.filter((item) => item.userId === comment.authorId && !item.read).length,
+    });
+    await persist();
+    return { liked: index < 0, count: data.commentLikes.filter((item) => item.commentId === commentId).length };
   },
 
   async deleteComment(commentId, userId, isAdmin = false) {
     const data = load();
     const comment = data.comments.find((item) => item.id === commentId);
-    if (!comment) return;
-    if (!isAdmin && comment.authorId !== userId) return;
+    if (!comment || (!isAdmin && comment.authorId !== userId)) return false;
+    const recipients = [...new Set(data.notifications.filter((item) => item.commentId === commentId).map((item) => item.userId))];
     data.comments = data.comments.filter((item) => item.id !== commentId);
+    data.commentLikes = data.commentLikes.filter((item) => item.commentId !== commentId);
     data.notifications = data.notifications.filter((item) => item.commentId !== commentId);
     await persist();
+    for (const recipient of recipients) {
+      publishToUser(recipient, {
+        count: data.notifications.filter((item) => item.userId === recipient && !item.read).length,
+      });
+    }
+    return true;
   },
 
-  async updateComment(commentId, userId, content, isAdmin = false) {
+  async updateComment(commentId, userId, content, _isAdmin = false) {
     const data = load();
     const comment = data.comments.find((item) => item.id === commentId);
-    if (!comment) return null;
-    if (!isAdmin && comment.authorId !== userId) return null;
+    if (!comment || comment.authorId !== userId) return null;
 
     const text = content.trim().slice(0, 500);
     if (!text) return null;
@@ -583,6 +647,8 @@ export const demoStore: Store = {
       content: comment.content,
       createdAt: comment.createdAt,
       author: authorOf(data, comment.authorId),
+      likeCount: data.commentLikes.filter((like) => like.commentId === commentId).length,
+      likedByMe: false,
     };
   },
 
@@ -597,6 +663,7 @@ export const demoStore: Store = {
         type: item.type,
         actor: authorOf(data, item.actorId),
         momentId: item.momentId,
+        commentId: item.commentId,
         preview: item.preview,
         read: item.read,
         createdAt: item.createdAt,
@@ -612,7 +679,10 @@ export const demoStore: Store = {
         changed = true;
       }
     }
-    if (changed) await persist();
+    if (changed) {
+      await persist();
+      publishToUser(userId, { count: 0 });
+    }
   },
 
   async unreadNotificationCount(userId) {
@@ -730,13 +800,36 @@ export const demoStore: Store = {
 
   async deleteUser(id) {
     const data = load();
+    const removedMoments = new Set(data.moments.filter((moment) => moment.authorId === id).map((moment) => moment.id));
+    const removedComments = new Set(data.comments.filter((comment) => comment.authorId === id || removedMoments.has(comment.momentId)).map((comment) => comment.id));
+    const recipients = [...new Set(data.notifications
+      .filter((item) =>
+        item.userId !== id &&
+        ((item.momentId !== null && removedMoments.has(item.momentId)) ||
+          (item.commentId !== null && removedComments.has(item.commentId)) ||
+          item.actorId === id),
+      )
+      .map((item) => item.userId))];
+
     data.users = data.users.filter((user) => user.id !== id);
     data.posts = data.posts.filter((post) => post.authorId !== id);
     data.moments = data.moments.filter((moment) => moment.authorId !== id);
-    data.follows = data.follows.filter(
-      (row) => row.followerId !== id && row.followingId !== id,
+    data.follows = data.follows.filter((row) => row.followerId !== id && row.followingId !== id);
+    data.likes = data.likes.filter((like) => like.userId !== id && !removedMoments.has(like.momentId));
+    data.comments = data.comments.filter((comment) => !removedComments.has(comment.id));
+    data.commentLikes = data.commentLikes.filter((like) => like.userId !== id && !removedComments.has(like.commentId));
+    data.notifications = data.notifications.filter((item) =>
+      item.userId !== id &&
+      item.actorId !== id &&
+      !(item.momentId && removedMoments.has(item.momentId)) &&
+      !(item.commentId && removedComments.has(item.commentId)),
     );
     await persist();
+    for (const recipient of recipients) {
+      publishToUser(recipient, {
+        count: data.notifications.filter((item) => item.userId === recipient && !item.read).length,
+      });
+    }
   },
 
   // ---------------------------------------------------------------- follows
@@ -776,6 +869,9 @@ export const demoStore: Store = {
       (item) => !(item.type === "follow" && item.actorId === followerId && item.userId === followingId),
     );
     await persist();
+    publishToUser(followingId, {
+      count: data.notifications.filter((item) => item.userId === followingId && !item.read).length,
+    });
   },
 
   async isFollowing(followerId, followingId) {
@@ -924,8 +1020,19 @@ export const demoStore: Store = {
 
   async deleteMoment(id) {
     const data = load();
+    const recipients = [...new Set(data.notifications.filter((item) => item.momentId === id).map((item) => item.userId))];
+    const commentIds = new Set(data.comments.filter((item) => item.momentId === id).map((item) => item.id));
     data.moments = data.moments.filter((moment) => moment.id !== id);
+    data.likes = data.likes.filter((item) => item.momentId !== id);
+    data.comments = data.comments.filter((item) => item.momentId !== id);
+    data.commentLikes = data.commentLikes.filter((item) => !commentIds.has(item.commentId));
+    data.notifications = data.notifications.filter((item) => item.momentId !== id);
     await persist();
+    for (const recipient of recipients) {
+      publishToUser(recipient, {
+        count: data.notifications.filter((item) => item.userId === recipient && !item.read).length,
+      });
+    }
   },
 
   async saveFriend(input) {

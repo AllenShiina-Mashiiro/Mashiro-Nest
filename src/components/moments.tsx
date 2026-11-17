@@ -15,7 +15,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { MediaPicker } from "@/components/media-picker";
 import { UserAvatar } from "@/components/user-avatar";
-import type { Moment, PublicUser } from "@/lib/types";
+import type { Moment, MomentComment, PublicUser } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 
 type Session = { id: string; displayName: string; username: string; avatarUrl: string | null; role: string };
@@ -183,6 +183,7 @@ function MomentInteractions({
   const [error, setError] = useState<string | null>(null);
   const [editingComment, setEditingComment] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
+  const [commentLikePending, setCommentLikePending] = useState<string | null>(null);
 
   async function toggleLike() {
     if (!currentUser) {
@@ -222,7 +223,7 @@ function MomentInteractions({
         body: JSON.stringify({ momentId: moment.id, content: draft.trim() }),
       });
       const data = (await response.json()) as {
-        comment?: { id: string; content: string; createdAt: string; author: PublicUser | null };
+        comment?: MomentComment;
         error?: string;
       };
       if (!response.ok || !data.comment) throw new Error(data.error ?? "发送失败");
@@ -237,11 +238,43 @@ function MomentInteractions({
   }
 
   async function removeComment(id: string) {
-    if (!window.confirm("撤回这条评论？")) return;
+    const comment = comments.find((item) => item.id === id);
+    const isOwnComment = comment?.author?.id === currentUser?.id;
+    const action = isAdmin && !isOwnComment ? "删除" : "撤回";
+    if (!window.confirm(`${action}这条评论？`)) return;
     const response = await fetch(`/api/moments/comment?id=${id}`, { method: "DELETE" });
     if (response.ok) {
       setComments((list) => list.filter((item) => item.id !== id));
       if (editingComment === id) setEditingComment(null);
+    } else {
+      const data = (await response.json().catch(() => null)) as { error?: string } | null;
+      setError(data?.error ?? `${action}失败，请稍后再试`);
+    }
+  }
+
+  async function toggleCommentLike(id: string) {
+    if (!currentUser || commentLikePending) {
+      if (!currentUser) setError("登录后才能点赞评论");
+      return;
+    }
+    setCommentLikePending(id);
+    try {
+      const response = await fetch("/api/moments/comment", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const data = (await response.json()) as { liked?: boolean; count?: number; error?: string };
+      if (!response.ok || typeof data.liked !== "boolean" || typeof data.count !== "number") {
+        throw new Error(data.error ?? "点赞失败");
+      }
+      setComments((list) => list.map((item) => item.id === id
+        ? { ...item, likedByMe: data.liked!, likeCount: data.count! }
+        : item));
+    } catch (caught) {
+      setError((caught as Error).message || "点赞评论失败");
+    } finally {
+      setCommentLikePending(null);
     }
   }
 
@@ -254,14 +287,16 @@ function MomentInteractions({
       body: JSON.stringify({ id, content: text }),
     });
     const data = (await response.json()) as {
-      comment?: { id: string; content: string; createdAt: string; author: PublicUser | null };
+      comment?: MomentComment;
       error?: string;
     };
     if (!response.ok || !data.comment) {
       setError(data.error ?? "修改失败");
       return;
     }
-    setComments((list) => list.map((item) => (item.id === id ? data.comment! : item)));
+    setComments((list) => list.map((item) => item.id === id
+      ? { ...data.comment!, likeCount: item.likeCount, likedByMe: item.likedByMe }
+      : item));
     setEditingComment(null);
     setError(null);
   }
@@ -297,11 +332,13 @@ function MomentInteractions({
         <div className="mt-2 space-y-1.5">
           {comments.map((comment) => {
             const mine = comment.author?.id === currentUser?.id;
-            const canManage = isAdmin || mine;
+            const canDelete = isAdmin || mine;
+            const canEdit = mine;
             const editing = editingComment === comment.id;
             return (
               <div
                 key={comment.id}
+                id={`comment-${comment.id}`}
                 className="group flex items-start gap-2 rounded-xl bg-ink-50/70 px-2.5 py-1.5 dark:bg-white/5"
               >
                 <UserAvatar user={comment.author} size={20} />
@@ -353,8 +390,22 @@ function MomentInteractions({
                   )}
                 </div>
 
-                {canManage && !editing ? (
-                  <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition group-hover:opacity-100">
+                <span className="flex shrink-0 items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => void toggleCommentLike(comment.id)}
+                    disabled={!currentUser || Boolean(commentLikePending)}
+                    aria-pressed={comment.likedByMe}
+                    className={`inline-flex items-center gap-1 rounded px-1 py-0.5 text-[10px] transition disabled:opacity-50 ${
+                      comment.likedByMe ? "text-sakura-500" : "text-ink-300 hover:text-sakura-500"
+                    }`}
+                    aria-label="点赞评论"
+                    title="点赞评论"
+                  >
+                    <Heart className={`h-3 w-3 ${comment.likedByMe ? "fill-current" : ""}`} />
+                    {comment.likeCount > 0 ? comment.likeCount : ""}
+                  </button>
+                  {canEdit && !editing ? (
                     <button
                       type="button"
                       onClick={() => {
@@ -367,17 +418,19 @@ function MomentInteractions({
                     >
                       <Pencil className="h-3 w-3" />
                     </button>
+                  ) : null}
+                  {canDelete && !editing ? (
                     <button
                       type="button"
                       onClick={() => void removeComment(comment.id)}
                       className="rounded p-0.5 text-ink-300 transition hover:text-sakura-500"
-                      aria-label="撤回评论"
-                      title="撤回"
+                      aria-label={isAdmin && !mine ? "删除评论" : "撤回评论"}
+                      title={isAdmin && !mine ? "删除" : "撤回"}
                     >
                       <X className="h-3 w-3" />
                     </button>
-                  </span>
-                ) : null}
+                  ) : null}
+                </span>
               </div>
             );
           })}

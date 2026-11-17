@@ -216,6 +216,12 @@ export async function toggleMomentLike(momentId: string, userId: string) {
   return result;
 }
 
+export async function toggleMomentCommentLike(commentId: string, userId: string) {
+  const result = await (await db()).toggleCommentLike(commentId, userId);
+  await cacheDelByPrefix("content:moments");
+  return result;
+}
+
 export async function addMomentComment(
   momentId: string,
   userId: string,
@@ -230,9 +236,8 @@ export async function updateMomentComment(
   commentId: string,
   userId: string,
   content: string,
-  isAdmin = false,
 ): Promise<MomentComment | null> {
-  const comment = await (await db()).updateComment(commentId, userId, content, isAdmin);
+  const comment = await (await db()).updateComment(commentId, userId, content);
   await cacheDelByPrefix("content:moments");
   return comment;
 }
@@ -242,8 +247,9 @@ export async function removeMomentComment(
   userId: string,
   isAdmin = false,
 ) {
-  await (await db()).deleteComment(commentId, userId, isAdmin);
+  const removed = await (await db()).deleteComment(commentId, userId, isAdmin);
   await cacheDelByPrefix("content:moments");
+  return removed;
 }
 
 export async function listNotifications(

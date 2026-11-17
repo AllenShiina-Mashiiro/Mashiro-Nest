@@ -80,6 +80,8 @@ type MomentRow = {
     content: string;
     createdAt: Date;
     author: UserRow | null;
+    likes?: { userId: string }[];
+    _count?: { likes: number };
   }[];
   _count?: { likes: number };
 };
@@ -189,6 +191,8 @@ function mapMomentRow(row: MomentRow, viewerId?: string): Moment {
       content: comment.content,
       createdAt: comment.createdAt.toISOString(),
       author: comment.author ? toPublic(comment.author) : null,
+      likeCount: comment._count?.likes ?? comment.likes?.length ?? 0,
+      likedByMe: Boolean(viewerId && comment.likes?.some((like) => like.userId === viewerId)),
     })),
   };
 }
@@ -199,7 +203,11 @@ function momentInclude(viewerId?: string) {
     comments: {
       orderBy: { createdAt: "asc" },
       take: 100,
-      include: { author: true },
+      include: {
+        author: true,
+        likes: { where: { userId: viewerId ?? "__none__" }, select: { userId: true } },
+        _count: { select: { likes: true } },
+      },
     },
     likes: {
       where: { userId: viewerId ?? "__none__" },
@@ -353,11 +361,16 @@ export const databaseStore: Store = {
     })) as unknown as { momentId: string } | null;
 
     if (existing) {
-      await prisma.momentLike
-        .delete({ where: { momentId_userId: { momentId, userId } } })
-        .catch(() => undefined);
+      await prisma.momentLike.delete({
+        where: { momentId_userId: { momentId, userId } },
+      });
+      const moment = await prisma.moment.findUnique({ where: { id: momentId }, select: { authorId: true } });
+      if (moment && moment.authorId !== userId) {
+        await prisma.notification.deleteMany({ where: { userId: moment.authorId, actorId: userId, type: "like", momentId } });
+        publishToUser(moment.authorId, { count: await prisma.notification.count({ where: { userId: moment.authorId, read: false } }) });
+      }
     } else {
-      await prisma.momentLike.create({ data: { momentId, userId } }).catch(() => undefined);
+      await prisma.momentLike.create({ data: { momentId, userId } });
       const moment = (await prisma.moment.findUnique({
         where: { id: momentId },
         select: { authorId: true, content: true },
@@ -383,6 +396,41 @@ export const databaseStore: Store = {
 
     const count = await prisma.momentLike.count({ where: { momentId } });
     return { liked: !existing, count };
+  },
+
+  async toggleCommentLike(commentId, userId) {
+    const comment = await prisma.momentComment.findUnique({
+      where: { id: commentId },
+      select: { id: true, authorId: true, momentId: true, content: true },
+    });
+    if (!comment) throw new Error("COMMENT_NOT_FOUND");
+    const existing = await prisma.momentCommentLike.findUnique({
+      where: { commentId_userId: { commentId, userId } },
+    });
+    if (existing) {
+      await prisma.momentCommentLike.delete({ where: { commentId_userId: { commentId, userId } } });
+      await prisma.notification.deleteMany({
+        where: { userId: comment.authorId, actorId: userId, type: "comment_like", commentId },
+      });
+    } else {
+      await prisma.momentCommentLike.create({ data: { commentId, userId } });
+      if (comment.authorId !== userId) {
+        await prisma.notification.create({
+          data: {
+            userId: comment.authorId,
+            actorId: userId,
+            type: "comment_like",
+            momentId: comment.momentId,
+            commentId,
+            preview: comment.content.slice(0, 60),
+          },
+        });
+      }
+    }
+    publishToUser(comment.authorId, {
+      count: await prisma.notification.count({ where: { userId: comment.authorId, read: false } }),
+    });
+    return { liked: !existing, count: await prisma.momentCommentLike.count({ where: { commentId } }) };
   },
 
   async addComment(momentId, userId, content) {
@@ -426,27 +474,40 @@ export const databaseStore: Store = {
       content: row.content,
       createdAt: row.createdAt.toISOString(),
       author: row.author ? toPublic(row.author) : null,
+      likeCount: 0,
+      likedByMe: false,
     };
   },
 
   async deleteComment(commentId, userId, isAdmin = false) {
-    const row = (await prisma.momentComment.findUnique({
+    const row = await prisma.momentComment.findUnique({
       where: { id: commentId },
       select: { authorId: true },
-    })) as unknown as { authorId: string } | null;
-    if (!row) return;
-    if (!isAdmin && row.authorId !== userId) return;
-    await prisma.momentComment.delete({ where: { id: commentId } }).catch(() => undefined);
-    await prisma.notification.deleteMany({ where: { commentId } }).catch(() => undefined);
+    });
+    if (!row || (!isAdmin && row.authorId !== userId)) return false;
+    const notifications = await prisma.notification.findMany({
+      where: { commentId },
+      select: { userId: true },
+      distinct: ["userId"],
+    });
+    await prisma.$transaction([
+      prisma.momentComment.delete({ where: { id: commentId } }),
+      prisma.notification.deleteMany({ where: { commentId } }),
+    ]);
+    for (const recipient of notifications) {
+      publishToUser(recipient.userId, {
+        count: await prisma.notification.count({ where: { userId: recipient.userId, read: false } }),
+      });
+    }
+    return true;
   },
 
-  async updateComment(commentId, userId, content, isAdmin = false) {
+  async updateComment(commentId, userId, content, _isAdmin = false) {
     const row = (await prisma.momentComment.findUnique({
       where: { id: commentId },
       select: { authorId: true },
     })) as unknown as { authorId: string } | null;
-    if (!row) return null;
-    if (!isAdmin && row.authorId !== userId) return null;
+    if (!row || row.authorId !== userId) return null;
 
     const text = content.trim().slice(0, 500);
     if (!text) return null;
@@ -471,6 +532,8 @@ export const databaseStore: Store = {
       content: updated.content,
       createdAt: updated.createdAt.toISOString(),
       author: updated.author ? toPublic(updated.author) : null,
+      likeCount: await prisma.momentCommentLike.count({ where: { commentId } }),
+      likedByMe: false,
     };
   },
 
@@ -484,6 +547,7 @@ export const databaseStore: Store = {
       id: string;
       type: string;
       momentId: string | null;
+      commentId: string | null;
       preview: string | null;
       read: boolean;
       createdAt: Date;
@@ -492,9 +556,10 @@ export const databaseStore: Store = {
 
     return rows.map((row) => ({
       id: row.id,
-      type: (row.type as "like" | "comment" | "follow") ?? "like",
+      type: (row.type as "like" | "comment" | "comment_like" | "follow") ?? "like",
       actor: row.actor ? toPublic(row.actor) : null,
       momentId: row.momentId,
+      commentId: row.commentId,
       preview: row.preview,
       read: row.read,
       createdAt: row.createdAt.toISOString(),
@@ -505,6 +570,7 @@ export const databaseStore: Store = {
     await prisma.notification
       .updateMany({ where: { userId, read: false }, data: { read: true } })
       .catch(() => undefined);
+    publishToUser(userId, { count: 0 });
   },
 
   async unreadNotificationCount(userId) {
@@ -667,7 +733,17 @@ export const databaseStore: Store = {
   },
 
   async deleteUser(id) {
+    const recipients = await prisma.notification.findMany({
+      where: { actorId: id },
+      select: { userId: true },
+      distinct: ["userId"],
+    });
     await prisma.user.delete({ where: { id } });
+    for (const recipient of recipients) {
+      publishToUser(recipient.userId, {
+        count: await prisma.notification.count({ where: { userId: recipient.userId, read: false } }),
+      });
+    }
   },
 
   async follow(followerId, followingId) {
@@ -709,6 +785,9 @@ export const databaseStore: Store = {
     await prisma.notification
       .deleteMany({ where: { userId: followingId, actorId: followerId, type: "follow" } })
       .catch(() => undefined);
+    publishToUser(followingId, {
+      count: await prisma.notification.count({ where: { userId: followingId, read: false } }),
+    });
   },
 
   async isFollowing(followerId, followingId) {
@@ -899,7 +978,20 @@ export const databaseStore: Store = {
   },
 
   async deleteMoment(id) {
-    await prisma.moment.delete({ where: { id } }).catch(() => undefined);
+    const recipients = await prisma.notification.findMany({
+      where: { momentId: id },
+      select: { userId: true },
+      distinct: ["userId"],
+    });
+    await prisma.$transaction([
+      prisma.moment.delete({ where: { id } }),
+      prisma.notification.deleteMany({ where: { momentId: id } }),
+    ]);
+    for (const recipient of recipients) {
+      publishToUser(recipient.userId, {
+        count: await prisma.notification.count({ where: { userId: recipient.userId, read: false } }),
+      });
+    }
   },
 
   async saveFriend(input) {

@@ -50,6 +50,7 @@ model User {
 
   momentLikes    MomentLike[]
   momentComments MomentComment[]
+  commentLikes   MomentCommentLike[]
 
   notifications     Notification[] @relation("notificationRecipient")
   sentNotifications Notification[] @relation("notificationActor")
@@ -177,9 +178,23 @@ model MomentComment {
 
   moment Moment @relation(fields: [momentId], references: [id], onDelete: Cascade)
   author User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  likes  MomentCommentLike[]
 
   @@index([momentId, createdAt])
   @@map("moment_comments")
+}
+
+model MomentCommentLike {
+  commentId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  comment MomentComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([commentId, userId])
+  @@index([userId])
+  @@map("moment_comment_likes")
 }
 
 /// 点赞 / 评论 / 关注 都写一条，recipient 是「被通知的人」。

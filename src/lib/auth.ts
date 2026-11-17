@@ -1,7 +1,7 @@
 import { compare, hash } from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
-import { listUsers, storeInstance } from "@/lib/data";
+import { storeInstance } from "@/lib/data";
 import type { PublicUser, Role } from "@/lib/types";
 
 export const SESSION_COOKIE = "mizuki_session";
@@ -17,8 +17,11 @@ export type SessionUser = {
 };
 
 function secretKey() {
-  const secret = process.env.AUTH_SECRET ?? "mizuki-development-secret-please-change-me-32chars";
-  return new TextEncoder().encode(secret);
+  const secret = process.env.AUTH_SECRET?.trim();
+  if (process.env.NODE_ENV === "production" && (!secret || secret.length < 32)) {
+    throw new Error("AUTH_SECRET_REQUIRED: production requires an AUTH_SECRET of at least 32 characters");
+  }
+  return new TextEncoder().encode(secret || "local-development-only-secret-change-before-deploying");
 }
 
 export async function createSession(user: SessionUser) {
@@ -86,10 +89,11 @@ export async function getSession(): Promise<SessionUser | null> {
 }
 
 export function demoCredentials() {
-  return {
-    email: process.env.ADMIN_EMAIL ?? "admin@mizuki.dev",
-    password: process.env.ADMIN_PASSWORD ?? "mizuki",
-  };
+  const development = process.env.NODE_ENV !== "production";
+  const email = process.env.ADMIN_EMAIL?.trim() || (development ? "admin@mizuki.dev" : "");
+  const configuredPassword = process.env.ADMIN_PASSWORD || (development ? "mizuki" : "");
+  const password = development || configuredPassword.length >= 12 ? configuredPassword : "";
+  return { email, password };
 }
 
 export function toSessionUser(user: PublicUser, email: string): SessionUser {
@@ -116,16 +120,22 @@ export async function verifyCredentials(
     if (email.trim().toLowerCase() !== demo.email.toLowerCase() || password !== demo.password) {
       return null;
     }
-    const users = await listUsers();
-    if (users.length) return null;
-    return {
-      id: "bootstrap-admin",
-      username: "mizuki",
-      displayName: "Mizuki",
-      email: demo.email,
+    if (!demo.email || !demo.password) return null;
+    const users = await store.listUsers();
+    if (users.some((user) => user.role === "ADMIN")) return null;
+
+    // Bootstrap a real user row; a synthetic session ID cannot be revalidated
+    // by getSession(), which always reloads the account from the active store.
+    const username = process.env.ADMIN_USERNAME?.trim() || "AllenShiina";
+    const displayName = process.env.ADMIN_NAME?.trim() || username;
+    const user = await store.createUser({
+      email: demo.email.toLowerCase(),
+      username,
+      displayName,
+      passwordHash: await hash(demo.password, 10),
       role: "ADMIN",
-      avatarUrl: null,
-    };
+    });
+    return toSessionUser(user, demo.email.toLowerCase());
   }
 
   const ok = await compare(password, record.passwordHash);

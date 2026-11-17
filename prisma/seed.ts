@@ -49,9 +49,18 @@ function readPosts() {
 }
 
 async function main() {
-  const email = (process.env.ADMIN_EMAIL ?? "admin@mizuki.dev").toLowerCase();
+  const email = process.env.ADMIN_EMAIL?.trim().toLowerCase() || (process.env.NODE_ENV === "production" ? "" : "admin@mizuki.dev");
   const username = process.env.ADMIN_USERNAME ?? "AllenShiina";
-  const password = process.env.ADMIN_PASSWORD ?? "mizuki";
+  const password = process.env.ADMIN_PASSWORD || (process.env.NODE_ENV === "production" ? "" : "mizuki");
+  if (process.env.NODE_ENV === "production" && !email) {
+    throw new Error("ADMIN_EMAIL_REQUIRED: set ADMIN_EMAIL before running the production seed");
+  }
+  if (process.env.NODE_ENV === "production" && password.length < 12) {
+    throw new Error("ADMIN_PASSWORD_REQUIRED: production administrator passwords must be at least 12 characters");
+  }
+  if (!password) {
+    throw new Error("ADMIN_PASSWORD_REQUIRED: set ADMIN_PASSWORD before running the production seed");
+  }
 
   console.log("→ seeding admin user");
   const author = await prisma.user.upsert({
@@ -194,7 +203,8 @@ async function main() {
   });
 
   console.log("\n✓ seed finished");
-  console.log(`  admin: ${email} / ${password} (username: ${username})`);
+  console.log(`  admin email: ${email} (username: ${username})`);
+  console.log("  admin password: read from ADMIN_PASSWORD environment variable");
 }
 
 main()

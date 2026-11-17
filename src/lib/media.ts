@@ -33,8 +33,29 @@ function sha256(buffer: Buffer) {
   return createHash("sha256").update(buffer).digest("hex");
 }
 
+function safeUploadKey(key: string) {
+  if (
+    !key ||
+    key.includes("\\") ||
+    key.startsWith("/") ||
+    !key.startsWith("uploads/") ||
+    key.split("/").some((part) => !part || part === "." || part === "..") ||
+    path.posix.normalize(key) !== key
+  ) {
+    throw new MediaError("无效的媒体文件路径");
+  }
+  return key;
+}
+
 function localPath(key: string) {
-  return path.join(process.cwd(), "public", key);
+  const safeKey = safeUploadKey(key);
+  const publicRoot = path.resolve(process.cwd(), "public");
+  const target = path.resolve(publicRoot, safeKey);
+  const relative = path.relative(publicRoot, target);
+  if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
+    throw new MediaError("无效的媒体文件路径");
+  }
+  return target;
 }
 
 export type StorageDriver = "s3" | "local";
@@ -235,6 +256,7 @@ export function dedupeMedia(items: MediaItem[]) {
 }
 
 export async function deleteMediaByKey(key: string) {
+  safeUploadKey(key);
   if (storageDriver() !== "s3") {
     await fs.rm(localPath(key), { force: true });
     return;
