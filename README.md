@@ -182,23 +182,36 @@ POSTGRES_DB=mashiro
 
 请勿让 `AUTH_SECRET`、`ADMIN_PASSWORD` 和 `POSTGRES_PASSWORD` 使用相同值。生产环境应通过 Caddy、Nginx 或 Traefik 配置 HTTPS。
 
-### 2. 构建并启动
+### 2. 启动数据库
+
+先启动 PostgreSQL 和 Redis。此时暂时不启动 Web 容器：
 
 ```bash
-docker compose up -d --build
+docker compose up -d db redis
 ```
 
 ### 3. 初始化数据库与管理员
 
+正式运行镜像采用 Next.js standalone 模式，不包含 Prisma CLI 和 `tsx` 等开发工具。因此仓库提供独立的 `db-tools` 一次性容器，专门执行数据库维护命令：
+
 ```bash
-docker compose exec app npm run db:push
-docker compose exec app npm run db:admin
+# 构建工具镜像并同步数据库结构
+docker compose --profile tools run --rm --build db-tools
+
+# 创建管理员
+docker compose --profile tools run --rm db-tools npm run db:admin
 ```
 
 可选导入示例内容：
 
 ```bash
-docker compose exec app npm run db:seed
+docker compose --profile tools run --rm db-tools npm run db:seed
+```
+
+### 4. 构建并启动网站
+
+```bash
+docker compose up -d --build app
 ```
 
 ### 4. 运维命令
