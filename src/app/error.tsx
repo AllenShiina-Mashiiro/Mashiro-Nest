@@ -23,8 +23,9 @@ export default function GlobalError({
         页面出了点问题
       </h1>
       <p className="mt-2 text-[12.5px] leading-relaxed text-ink-500 dark:text-ink-300/85">
-        如果这是首次运行，请确认已配置 <code>DATABASE_URL</code> 并执行过{" "}
-        <code>npm run db:push</code>；没有数据库时会自动使用演示模式。
+        Mashiro Nest 现在仅使用 PostgreSQL，不会自动切换到演示模式。请确认已配置正确的{" "}
+        <code>DATABASE_URL</code>，并在项目目录执行 <code>npm run db:push</code>。
+        如果问题仍然存在，请查看运行终端中的错误日志。
       </p>
       {error.digest ? (
         <p className="mt-2 font-mono text-[10.5px] text-ink-300">digest: {error.digest}</p>
