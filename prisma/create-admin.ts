@@ -9,7 +9,7 @@ async function main() {
   const displayName = process.env.ADMIN_NAME?.trim() || "Site Admin";
   const password = process.env.ADMIN_PASSWORD ?? "";
 
-  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+  if (!email.includes("@") || !email.split("@")[1]?.includes(".")) {
     throw new Error("ADMIN_EMAIL_INVALID: set a valid ADMIN_EMAIL");
   }
   if (password.length < 12) {
