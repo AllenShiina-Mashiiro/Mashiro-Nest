@@ -34,7 +34,6 @@ services:
       - "${APP_PORT:-3000}:3000"
     volumes:
       - mashiro_uploads:/app/public/uploads
-      - mashiro_data:/app/.data
     depends_on:
       db:
         condition: service_healthy
@@ -95,4 +94,3 @@ volumes:
   mashiro_pgdata:
   mashiro_redisdata:
   mashiro_uploads:
-  mashiro_data:
