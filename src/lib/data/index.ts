@@ -19,72 +19,43 @@ import type {
   Store,
   TagRef,
 } from "@/lib/types";
-import { demoStore } from "./demo";
 
 const TTL = Number(process.env.CACHE_TTL ?? 30);
 
-/**
- * The site runs in two modes:
- *  - `database`: PostgreSQL through Prisma (production / configured dev)
- *  - `demo`:     a writable JSON store under `.data/` (zero infra)
- */
-export function isDemoMode() {
-  return process.env.BLOG_DEMO === "1" || !process.env.DATABASE_URL;
+/** PostgreSQL is the only supported data store. Never silently switch databases. */
+let pending: Promise<Store> | null = null;
+
+async function databaseStorePromise(): Promise<Store> {
+  if (!process.env.DATABASE_URL?.trim()) {
+    throw new Error("DATABASE_URL_REQUIRED: configure PostgreSQL before starting Mashiro Nest");
+  }
+  if (!pending) {
+    pending = (async () => {
+      const mod = await import("./database");
+      await mod.pingDatabase();
+      return mod.databaseStore as Store;
+    })();
+  }
+  try {
+    return await pending;
+  } catch (error) {
+    pending = null;
+    throw error;
+  }
 }
 
-let pending: Promise<Store> | null = null;
-let resolved: { mode: "database" | "demo"; at: number } | null = null;
-let lastWarnAt = 0;
+export async function dataMode(): Promise<"database"> {
+  await databaseStorePromise();
+  return "database";
+}
 
-/**
- * Resolve the active store. When `DATABASE_URL` is configured we ping the
- * database first and silently fall back to the JSON store if it is unreachable,
- * so a stopped PostgreSQL never takes the whole site down.
- */
-async function db(): Promise<Store> {
-  if (isDemoMode()) {
-    resolved = { mode: "demo", at: Date.now() };
-    return demoStore;
-  }
-
-  if (resolved && Date.now() - resolved.at < 15_000) {
-    if (resolved.mode === "demo") return demoStore;
-    return databaseStorePromise();
-  }
-
-  try {
-    const mod = await import("./database");
-    await mod.pingDatabase();
-    resolved = { mode: "database", at: Date.now() };
-    if (!pending) pending = Promise.resolve(mod.databaseStore as Store);
-  } catch (error) {
-    if (Date.now() - lastWarnAt > 60_000) {
-      lastWarnAt = Date.now();
-      const raw = error instanceof Error ? error.message.trim() : String(error);
-      console.warn(
-        "[mashiro] PostgreSQL 连接失败，回退到本地 JSON 模式（.data/store.json）：",
-        raw.split("\n")[0] || "无法连接数据库",
-      );
-    }
-    resolved = { mode: "demo", at: Date.now() };
-    return demoStore;
-  }
-
+/** Raw PostgreSQL store (no read cache), used by auth and admin tooling. */
+export async function storeInstance(): Promise<Store> {
   return databaseStorePromise();
 }
 
-async function databaseStorePromise(): Promise<Store> {
-  if (!pending) pending = import("./database").then((mod) => mod.databaseStore as Store);
-  return pending;
-}
-
-export async function dataMode(): Promise<"database" | "demo"> {
-  return (await db()).mode;
-}
-
-/** Raw store (no read cache) — used by admin tooling such as the media scan. */
-export async function storeInstance(): Promise<Store> {
-  return db();
+async function db(): Promise<Store> {
+  return databaseStorePromise();
 }
 
 // ------------------------------------------------------------------ reads --
