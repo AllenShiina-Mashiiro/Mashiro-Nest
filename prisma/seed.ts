@@ -179,7 +179,7 @@ async function main() {
   });
 
   console.log("\n✓ seed finished");
-  console.log(`  admin email: ${email} (username: ${username})`);
+  console.log(`  admin email: ${email} (username: ${author.username})`);
   console.log("  admin password: read from ADMIN_PASSWORD environment variable");
 }
 
