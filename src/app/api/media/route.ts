@@ -30,6 +30,7 @@ export async function POST(request: Request) {
     if (error instanceof MediaError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
+    console.error("[media] Upload failed:", error);
     return NextResponse.json({ error: "上传失败，请稍后再试" }, { status: 500 });
   }
 }
