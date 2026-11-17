@@ -1,4 +1,6 @@
 import { BackToTop } from "@/components/back-to-top";
+import { Live2D } from "@/components/live2d/live2d";
+import { MusicPlayer } from "@/components/music-player/music-player";
 import SakuraPetals from "@/components/sakura-petals";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
@@ -26,6 +28,8 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
         github={settings.githubUrl}
       />
       <BackToTop />
+      <MusicPlayer />
+      <Live2D />
     </>
   );
 }

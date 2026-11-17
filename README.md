@@ -27,6 +27,7 @@
 - 🤝 用户关注关系
 - 🔔 站内通知
 - 🖼️ 媒体库与图片上传
+- 🎵 音乐播放器与 🧸 Live2D 看板娘
 - ⚙️ 站点设置及管理后台
 
 ## 🛠️ 技术栈
@@ -39,6 +40,8 @@
 | ORM | Prisma 6 |
 | 缓存 | Redis（可选，不影响 PostgreSQL 主存储） |
 | 文件存储 | 本地磁盘 / S3 兼容对象存储 |
+| 看板娘 | l2d-widget（Live2D Cubism 2 / 3 / 4） |
+| 音乐播放 | HTMLAudioElement + React Hooks |
 | 运行环境 | Node.js 22.x LTS、npm |
 
 ### 🗄️ 数据库原则
@@ -280,6 +283,51 @@ npm run db:admin
 | `npm run db:admin` | 创建首个管理员 |
 | `npm run db:seed` | 导入示例内容 |
 | `npm run db:studio` | 打开 Prisma Studio |
+
+## 🎀 看板娘与音乐播放器
+
+两个组件都挂在 `src/app/(site)/layout.tsx`（只在前台出现），不写数据库、不依赖外部接口。
+配置集中在 `src/config/`，加歌、换模型都不用改组件代码。
+
+### 🎵 音乐播放器
+
+| 文件 | 作用 |
+| --- | --- |
+| `src/config/music.ts` | 歌曲列表、音量、是否循环 / 随机 |
+| `src/hooks/use-audio-player.ts` | 播放状态机（单例 `HTMLAudioElement`，事件驱动，卸载时释放） |
+| `src/components/music-player/` | 播放器外壳、控制条、进度条、音量、歌单 |
+
+加歌：
+
+1. 音频放 `public/music/tracks/`，封面放 `public/music/covers/`；
+2. 在 `musicConfig.tracks` 里追加 `{ id, title, artist, cover, url }`，`id` 保持唯一。
+
+播放器挂在布局里，前台切换路由不会中断播放；音量、循环方式、随机和当前曲目记在
+`localStorage`。默认不自动播放（浏览器会拦截），`autoplay` 保持 `false`。
+
+### 🧸 看板娘（Live2D）
+
+| 文件 | 作用 |
+| --- | --- |
+| `src/config/live2d.ts` | 模型路径、位置、尺寸、气泡文案、移动端策略 |
+| `src/components/live2d/live2d.tsx` | 挂载 / 销毁 [`l2d-widget`](https://github.com/hacxy/l2d-widget) 实例 |
+
+放模型：
+
+1. Cubism 2 模型放 `public/live2d/models/<名字>/model.json`（连同纹理、动作、物理文件），开箱即用；
+2. Cubism 3/4 模型（`*.model3.json`）还需要把官方 `live2dcubismcore.min.js` 放到
+   `public/live2d/core/`，并在配置里打开 `cubismCoreSrc`；
+3. 改 `live2dConfig.models[].path` 指向它；`models` 传多个时，悬浮菜单会自动出现切换按钮。
+
+行为说明：
+
+- 移动端默认不显示（`mobile.enabled: false`，阈值 `maxWidth`）；系统开启“减少动态效果”时也不显示；
+- 模型文件不存在时直接跳过，不会在页面上留下“加载中”的半截 UI，开发环境控制台会提示缺哪个文件；
+- 运行时约 440 KB，延迟 `loadDelayMs` 后懒加载，不进首屏；
+- 隐藏后点左下角的休息状态条即可唤醒，菜单里有“让她休息一下”。
+
+关闭任一组件：把对应配置里的 `enabled` 改成 `false`。
+`public/music` 与 `public/live2d` 下各有一份资源说明；模型和音乐请自行确认授权。
 
 ## 💾 数据备份
 
