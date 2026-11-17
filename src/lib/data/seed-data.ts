@@ -64,7 +64,7 @@ export const demoFriends: Friend[] = [
     name: "Astro",
     url: "https://astro.build/",
     avatar: null,
-    description: "内容优先的 Web 框架，Mizuki 主题的家。",
+    description: "内容优先的 Web 框架，Mashiro 主题的家。",
     color: "#f4b78f",
   },
   {
@@ -186,7 +186,7 @@ export const demoAnime: AnimeItem[] = [
 
 export const demoAboutPage = `## 关于我
 
-你好，我是 **Mizuki**，一个白天写前端、晚上写博客的人。
+你好，我是 **Mashiro**，一个白天写前端、晚上写博客的人。
 
 喜欢的东西：樱花、渐变、干净的排版、能跑起来的代码，以及深夜两点还愿意重构的决心。
 
@@ -210,7 +210,7 @@ export const demoAboutPage = `## 关于我
 
 ## 联系方式
 
-- Email: [hello@mizuki.dev](mailto:hello@mizuki.dev)
+- Email: [hello@mashiro.dev](mailto:hello@mashiro.dev)
 - GitHub: [github.com](https://github.com/)
 
 > 如果你也在搭建自己的博客，希望这份代码能省下你几个夜晚。
