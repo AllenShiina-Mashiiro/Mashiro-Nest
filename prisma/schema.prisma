@@ -1,0 +1,248 @@
+// Mizuki Next — data model v2 (multi-user blog + site settings)
+// PostgreSQL + Prisma. Run `npm run db:push && npm run db:seed` to bootstrap.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum AnimeStatus {
+  WATCHING
+  COMPLETED
+  PLANNED
+  PAUSED
+  DROPPED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  username     String   @unique
+  displayName  String
+  passwordHash String
+  role         Role     @default(USER)
+
+  avatarUrl String?
+  bannerUrl String?
+  bio       String  @default("")
+  status    String  @default("写代码中")
+  location  String?
+  website   String?
+  github    String?
+  telegram  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  posts     Post[]
+  moments   Moment[]
+  following Follow[] @relation("follower")
+  followers Follow[] @relation("following")
+
+  momentLikes    MomentLike[]
+  momentComments MomentComment[]
+
+  notifications     Notification[] @relation("notificationRecipient")
+  sentNotifications Notification[] @relation("notificationActor")
+
+  @@index([role])
+  @@map("users")
+}
+
+model Follow {
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  follower  User @relation("follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@id([followerId, followingId])
+  @@index([followingId])
+  @@map("follows")
+}
+
+model Post {
+  id          String    @id @default(cuid())
+  slug        String    @unique
+  title       String
+  description String    @default("")
+  content     String    @db.Text
+  coverUrl    String?
+  published   Boolean   @default(false)
+  featured    Boolean   @default(false)
+  pinned      Boolean   @default(false)
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  wordCount   Int       @default(0)
+  readingTime Int       @default(0)
+  views       Int       @default(0)
+
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  tags PostTag[]
+
+  @@index([published, publishedAt])
+  @@index([categoryId])
+  @@index([authorId])
+  @@map("posts")
+}
+
+model Category {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  name        String
+  description String  @default("")
+  color       String  @default("#7dd3c0")
+  order       Int     @default(0)
+  posts       Post[]
+
+  @@map("categories")
+}
+
+model Tag {
+  id    String    @id @default(cuid())
+  slug  String    @unique
+  name  String
+  color String    @default("#f9a8d4")
+  posts PostTag[]
+
+  @@map("tags")
+}
+
+model PostTag {
+  postId String
+  tagId  String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([postId, tagId])
+  @@index([tagId])
+  @@map("post_tags")
+}
+
+model Moment {
+  id        String   @id @default(cuid())
+  content   String   @db.Text
+  images    String[] @default([])
+  location  String?
+  published Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  likes    MomentLike[]
+  comments MomentComment[]
+
+  @@index([published, createdAt])
+  @@index([authorId])
+  @@map("moments")
+}
+
+model MomentLike {
+  momentId  String
+  userId    String
+  createdAt DateTime @default(now())
+
+  moment Moment @relation(fields: [momentId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([momentId, userId])
+  @@index([userId])
+  @@map("moment_likes")
+}
+
+model MomentComment {
+  id        String   @id @default(cuid())
+  momentId  String
+  authorId  String
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+
+  moment Moment @relation(fields: [momentId], references: [id], onDelete: Cascade)
+  author User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([momentId, createdAt])
+  @@map("moment_comments")
+}
+
+/// 点赞 / 评论 / 关注 都写一条，recipient 是「被通知的人」。
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  actorId   String
+  type      String
+  momentId  String?
+  commentId String?
+  preview   String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user  User @relation("notificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
+  actor User @relation("notificationActor", fields: [actorId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read, createdAt])
+  @@map("notifications")
+}
+
+model Friend {
+  id          String  @id @default(cuid())
+  name        String
+  url         String
+  avatarUrl   String?
+  description String  @default("")
+  color       String  @default("#7dd3c0")
+  order       Int     @default(0)
+
+  @@map("friends")
+}
+
+model Anime {
+  id       String      @id @default(cuid())
+  title    String
+  coverUrl String?
+  status   AnimeStatus @default(PLANNED)
+  rating   Int         @default(0)
+  comment  String      @default("")
+  season   String?
+  year     Int?
+  order    Int         @default(0)
+
+  @@index([status, order])
+  @@map("anime")
+}
+
+model Page {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  title     String
+  content   String   @db.Text
+  updatedAt DateTime @updatedAt
+
+  @@map("pages")
+}
+
+/// Key/value store for site settings; values are JSON encoded strings.
+model Setting {
+  key       String   @id
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt
+
+  @@map("settings")
+}
