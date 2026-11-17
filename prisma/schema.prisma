@@ -1,4 +1,4 @@
-// Mizuki Next — data model v2 (multi-user blog + site settings)
+// Mashiro Nest — data model v2 (multi-user blog + site settings)
 // PostgreSQL + Prisma. Run `npm run db:push && npm run db:seed` to bootstrap.
 
 generator client {
