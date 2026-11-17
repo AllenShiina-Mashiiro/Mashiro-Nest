@@ -8,19 +8,19 @@ export const siteConfig: SiteConfig = {
   subtitle: "Mashiro Nest",
   titleZh: "真白屋",
   description:
-    "Mizuki — 一个用 Next.js、React、PostgreSQL、Prisma、Redis、S3 与 Tailwind CSS 构建的个人博客。",
+    "Mashiro — 一个用 Next.js、React、PostgreSQL、Prisma、Redis、S3 与 Tailwind CSS 构建的个人博客。",
   keywords: ["博客", "Next.js", "React", "Prisma", "Tailwind CSS", "Redis", "S3"],
   url: siteUrl,
   locale: "zh-CN",
   timeZone: "Asia/Shanghai",
   author: {
-    name: "Mizuki",
+    name: "Mashiro",
     role: "Front-end / Full-stack",
     bio: "This is a description",
     avatar: "/images/avatar.svg",
-    email: "hello@mizuki.dev",
+    email: "hello@mashiro.dev",
     socials: [
-      { label: "Email", href: "mailto:hello@mizuki.dev", icon: "mail" },
+      { label: "Email", href: "mailto:hello@mashiro.dev", icon: "mail" },
       { label: "GitHub", href: "https://github.com/", icon: "github" },
       { label: "RSS", href: "/rss.xml", icon: "rss" },
     ],
