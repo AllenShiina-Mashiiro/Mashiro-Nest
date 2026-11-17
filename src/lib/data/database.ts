@@ -219,9 +219,27 @@ function momentInclude(viewerId?: string) {
 
 const SETTINGS_KEY = "site";
 
-/** Cheap liveness probe used to decide between PostgreSQL and the JSON store. */
+/** Verify PostgreSQL readiness, retrying brief startup/network interruptions. */
 export async function pingDatabase() {
-  await prisma.$queryRaw`SELECT 1`;
+  const delays = [0, 300, 900];
+  let lastError: unknown;
+
+  for (const delay of delays) {
+    if (delay > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError instanceof Error
+    ? new Error(`POSTGRESQL_UNAVAILABLE: database health check failed after 3 attempts: ${lastError.message}`, { cause: lastError })
+    : new Error("POSTGRESQL_UNAVAILABLE: database health check failed after 3 attempts");
 }
 
 export const databaseStore: Store = {
