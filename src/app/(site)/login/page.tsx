@@ -3,8 +3,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { LoginForm } from "@/components/auth-forms";
-import { demoCredentials, getSession } from "@/lib/auth";
-import { getSettings, isDemoMode } from "@/lib/data";
+import { getSession } from "@/lib/auth";
+import { getSettings } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
 
@@ -22,8 +22,7 @@ export default async function LoginPage({
   const params = await searchParams;
   if (session) redirect(params.next ?? "/");
 
-  const [settings, demo] = await Promise.all([getSettings(), isDemoMode()]);
-  const credentials = demoCredentials();
+  const settings = await getSettings();
 
   return (
     <div className="relative flex min-h-dvh items-center justify-center px-5 py-16">
@@ -55,9 +54,6 @@ export default async function LoginPage({
           <div className="mt-6">
             <LoginForm
               redirectTo={params.next ?? "/"}
-              demo={demo}
-              demoEmail={demo ? credentials.email : undefined}
-              demoPassword={demo ? credentials.password : undefined}
             />
           </div>
 
