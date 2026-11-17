@@ -1,10 +1,10 @@
-import { compare, hash } from "bcryptjs";
+import { compare } from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { storeInstance } from "@/lib/data";
 import type { PublicUser, Role } from "@/lib/types";
 
-export const SESSION_COOKIE = "mizuki_session";
+export const SESSION_COOKIE = "mashiro_session";
 const MAX_AGE = 60 * 60 * 24 * 7;
 
 export type SessionUser = {
@@ -88,14 +88,6 @@ export async function getSession(): Promise<SessionUser | null> {
   }
 }
 
-export function demoCredentials() {
-  const development = process.env.NODE_ENV !== "production";
-  const email = process.env.ADMIN_EMAIL?.trim() || (development ? "admin@mizuki.dev" : "");
-  const configuredPassword = process.env.ADMIN_PASSWORD || (development ? "mizuki" : "");
-  const password = development || configuredPassword.length >= 12 ? configuredPassword : "";
-  return { email, password };
-}
-
 export function toSessionUser(user: PublicUser, email: string): SessionUser {
   return {
     id: user.id,
@@ -113,30 +105,7 @@ export async function verifyCredentials(
 ): Promise<SessionUser | null> {
   const store = await storeInstance();
   const record = await store.getUserByEmail(email.trim().toLowerCase());
-  if (!record) {
-    // A fresh database may not have been seeded yet: allow the env credentials
-    // to bootstrap the very first admin.
-    const demo = demoCredentials();
-    if (email.trim().toLowerCase() !== demo.email.toLowerCase() || password !== demo.password) {
-      return null;
-    }
-    if (!demo.email || !demo.password) return null;
-    const users = await store.listUsers();
-    if (users.some((user) => user.role === "ADMIN")) return null;
-
-    // Bootstrap a real user row; a synthetic session ID cannot be revalidated
-    // by getSession(), which always reloads the account from the active store.
-    const username = process.env.ADMIN_USERNAME?.trim() || "AllenShiina";
-    const displayName = process.env.ADMIN_NAME?.trim() || username;
-    const user = await store.createUser({
-      email: demo.email.toLowerCase(),
-      username,
-      displayName,
-      passwordHash: await hash(demo.password, 10),
-      role: "ADMIN",
-    });
-    return toSessionUser(user, demo.email.toLowerCase());
-  }
+  if (!record) return null;
 
   const ok = await compare(password, record.passwordHash);
   if (!ok) return null;
