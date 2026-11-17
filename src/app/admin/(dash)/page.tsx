@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { UserAvatar } from "@/components/user-avatar";
 import { getSession } from "@/lib/auth";
-import { getMoments, getPosts, getStats, isDemoMode, listUsers } from "@/lib/data";
+import { getMoments, getPosts, getStats, listUsers } from "@/lib/data";
 import { hasRedis } from "@/lib/redis";
 import { storageStatus } from "@/lib/media";
 import { formatDate, formatNumber } from "@/lib/utils";
@@ -48,7 +48,7 @@ export default async function AdminDashboardPage() {
   ];
 
   const systems = [
-    { label: "数据模式", value: isDemoMode() ? "本地 JSON" : "PostgreSQL", ok: !isDemoMode(), icon: HardDrive },
+    { label: "数据库", value: "PostgreSQL", ok: true, icon: HardDrive },
     { label: "缓存", value: hasRedis() ? "Redis" : "内存（降级）", ok: hasRedis(), icon: Zap },
     {
       label: "对象存储",
