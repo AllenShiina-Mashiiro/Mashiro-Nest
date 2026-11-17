@@ -28,8 +28,8 @@ ENV HOSTNAME="0.0.0.0"
 
 RUN groupadd --system --gid 1001 nodejs \
   && useradd --system --uid 1001 --gid nodejs nextjs \
-  && mkdir -p .data public/uploads \
-  && chown -R nextjs:nodejs .data public/uploads
+  && mkdir -p public/uploads \
+  && chown -R nextjs:nodejs public/uploads
 
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
