@@ -7,6 +7,13 @@ COPY package.json package-lock.json ./
 COPY prisma ./prisma
 RUN npm ci
 
+# Keep Prisma CLI and tsx available in a dedicated one-off image.
+# The production runner remains small and does not need development tools.
+FROM dependencies AS db-tools
+WORKDIR /app
+COPY . .
+CMD ["npm", "run", "db:push"]
+
 FROM node:22-bookworm-slim AS builder
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
