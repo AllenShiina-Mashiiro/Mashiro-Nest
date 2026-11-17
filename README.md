@@ -310,20 +310,32 @@ npm run db:admin
 | 文件 | 作用 |
 | --- | --- |
 | `src/config/live2d.ts` | 模型路径、位置、尺寸、气泡文案、移动端策略 |
-| `src/components/live2d/live2d.tsx` | 挂载 / 销毁 [`l2d-widget`](https://github.com/hacxy/l2d-widget) 实例 |
+| `src/components/live2d/live2d.tsx` | 加载运行时、挂载 / 销毁 [`l2d-widget`](https://github.com/hacxy/l2d-widget) 实例 |
+| `public/vendor/l2d-widget.min.js` | 官方 IIFE 构建（自带 Cubism 2 / 4 运行时），约 644 KB，按需加载 |
 
 放模型：
 
-1. Cubism 2 模型放 `public/live2d/models/<名字>/model.json`（连同纹理、动作、物理文件），开箱即用；
-2. Cubism 3/4 模型（`*.model3.json`）还需要把官方 `live2dcubismcore.min.js` 放到
-   `public/live2d/core/`，并在配置里打开 `cubismCoreSrc`；
-3. 改 `live2dConfig.models[].path` 指向它；`models` 传多个时，悬浮菜单会自动出现切换按钮。
+1. 模型放 `public/live2d/models/<名字>/`（`model.json` 或 `*.model3.json`，连同纹理、动作、物理文件）；
+2. 改 `live2dConfig.models[].path` 指向它；`models` 传多个时，悬浮菜单会自动出现切换按钮；
+3. 现在的默认值是库作者的演示模型（`https://model.hacxy.cn/cat-black/model.json`），
+   第一次打开就能看到效果，**正式使用请换成自己的本地模型**。
+
+关于运行时：不要改成 `import { createWidget } from "l2d-widget"`。该包的 ESM 产物在模块初始化阶段
+就读取 `Live2DCubismCore` 全局，经 webpack 生产构建压缩后这个读取会被提前到模块顶层，
+未预加载 Core 时会抛 `ReferenceError: Live2DCubismCore is not defined`（dev 模式因为不压缩，
+反而看不出来）。所以这里用官方 IIFE 构建 + `<script>` 按需加载，Cubism 2/3/4 模型都能直接用。
+升级 npm 包后记得同步 `public/vendor/l2d-widget.min.js`：
+
+```bash
+npm update l2d-widget
+cp node_modules/l2d-widget/dist/index.min.js public/vendor/l2d-widget.min.js
+```
 
 行为说明：
 
 - 移动端默认不显示（`mobile.enabled: false`，阈值 `maxWidth`）；系统开启“减少动态效果”时也不显示；
-- 模型文件不存在时直接跳过，不会在页面上留下“加载中”的半截 UI，开发环境控制台会提示缺哪个文件；
-- 运行时约 440 KB，延迟 `loadDelayMs` 后懒加载，不进首屏；
+- 模型文件不存在时直接跳过，不会在页面上留下“加载中”的半截 UI（开发环境控制台提示缺哪个文件）；
+- 运行时和模型都在 `loadDelayMs` 之后才加载，不进首屏；
 - 隐藏后点左下角的休息状态条即可唤醒，菜单里有“让她休息一下”。
 
 关闭任一组件：把对应配置里的 `enabled` 改成 `false`。

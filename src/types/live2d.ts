@@ -44,8 +44,8 @@ export type Live2DConfig = {
   mobile: { enabled: boolean; maxWidth: number };
   /** 系统开启“减少动态效果”时是否直接不显示 */
   respectReducedMotion: boolean;
-  /** Cubism 3/4 模型必须先加载 Cubism Core，这里填 public 下的相对路径 */
-  cubismCoreSrc?: string;
+  /** 运行时脚本地址（public 下的官方 IIFE 构建，自带 Cubism Core） */
+  bundleSrc: string;
   /** 追加一个“让她休息”的菜单项，不填则不加 */
   restMenuLabel?: string;
 };

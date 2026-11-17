@@ -89,7 +89,6 @@ export function AdminShell({
         <div className="mt-auto space-y-2">
           <Link
             href="/"
-            target="_blank"
             className="flex items-center gap-2 rounded-xl px-3 py-2 text-[12px] text-ink-400 transition hover:bg-ink-100/60 hover:text-ink-700 dark:hover:bg-white/5 dark:hover:text-white"
           >
             <ExternalLink className="h-3.5 w-3.5" />
@@ -145,7 +144,6 @@ export function AdminShell({
             </span>
             <Link
               href="/"
-              target="_blank"
               className="grid h-8 w-8 place-items-center rounded-lg text-ink-400 transition hover:bg-ink-100 hover:text-ink-700 lg:hidden dark:hover:bg-white/5"
               aria-label="查看站点"
             >
