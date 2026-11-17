@@ -16,7 +16,7 @@ concurrency:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -50,3 +50,6 @@ jobs:
           NEXT_PUBLIC_SITE_URL: https://example.invalid
           BLOG_DEMO: "1"
           NEXT_TELEMETRY_DISABLED: "1"
+
+      - name: Build Docker image
+        run: docker build --build-arg NEXT_PUBLIC_SITE_URL=https://example.invalid -t mashiro-nest:ci .

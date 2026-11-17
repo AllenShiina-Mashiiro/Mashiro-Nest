@@ -170,7 +170,7 @@ POSTGRES_PASSWORD=独立且足够长的数据库密码
 openssl rand -base64 48
 ```
 
-请为 `AUTH_SECRET`、`ADMIN_PASSWORD` 和 `POSTGRES_PASSWORD` 使用不同的值。不要把真实的 `.env` 提交到 Git。
+请为 `AUTH_SECRET`、`ADMIN_PASSWORD` 和 `POSTGRES_PASSWORD` 使用不同的值。数据库密码建议使用仅包含十六进制字符的随机值（例如 `openssl rand -hex 32`），避免连接字符串中的特殊字符导致解析失败。不要把真实的 `.env` 提交到 Git。
 
 ### 2. 构建并启动服务
 
