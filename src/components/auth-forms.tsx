@@ -171,7 +171,7 @@ export function RegisterForm() {
         required
         value={form.username}
         onChange={(event) => setForm({ ...form, username: event.target.value })}
-        placeholder="mizuki"
+        placeholder="mashiro"
         autoComplete="username"
       />
       <Field
