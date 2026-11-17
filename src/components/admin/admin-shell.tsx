@@ -48,7 +48,7 @@ export function AdminShell({
 }: {
   children: React.ReactNode;
   user: SessionUser;
-  mode: "database" | "demo";
+  mode: "database";
   siteName: string;
 }) {
   const pathname = usePathname();
@@ -139,17 +139,10 @@ export function AdminShell({
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
-            {mode === "demo" ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[10.5px] font-semibold text-amber-600 dark:bg-amber-400/10 dark:text-amber-300">
-                <Database className="h-3 w-3" />
-                本地模式
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 rounded-full bg-mint-50 px-2.5 py-1 text-[10.5px] font-semibold text-mint-600 dark:bg-mint-400/10 dark:text-mint-300">
-                <Database className="h-3 w-3" />
-                PostgreSQL
-              </span>
-            )}
+            <span className="inline-flex items-center gap-1 rounded-full bg-mint-50 px-2.5 py-1 text-[10.5px] font-semibold text-mint-600 dark:bg-mint-400/10 dark:text-mint-300">
+              <Database className="h-3 w-3" />
+              PostgreSQL
+            </span>
             <Link
               href="/"
               target="_blank"
