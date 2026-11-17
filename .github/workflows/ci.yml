@@ -48,7 +48,6 @@ jobs:
           ADMIN_EMAIL: ci@example.invalid
           ADMIN_PASSWORD: ci-only-password-not-used-at-runtime
           NEXT_PUBLIC_SITE_URL: https://example.invalid
-          BLOG_DEMO: "1"
           NEXT_TELEMETRY_DISABLED: "1"
 
       - name: Build Docker image
