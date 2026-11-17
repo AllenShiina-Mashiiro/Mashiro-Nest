@@ -41,7 +41,7 @@ export async function POST(request: Request) {
   }
 
   const adminEmail = (
-    process.env.ADMIN_EMAIL || (process.env.NODE_ENV !== "production" ? "admin@mizuki.dev" : "")
+    process.env.ADMIN_EMAIL || "admin@mashiro.dev"
   ).trim().toLowerCase();
   const adminUsername = (process.env.ADMIN_USERNAME || "AllenShiina").trim().toLowerCase();
   if ((adminEmail && email === adminEmail) || username === adminUsername) {
