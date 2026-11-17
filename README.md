@@ -286,39 +286,46 @@ npm run db:admin
 
 ## 🎀 看板娘与音乐播放器
 
-两个组件都挂在 `src/app/(site)/layout.tsx`（只在前台出现），不写数据库、不依赖外部接口。
-配置集中在 `src/config/`，加歌、换模型都不用改组件代码。
+两个组件都挂在 `src/app/(site)/layout.tsx`（只在前台出现），**配置全部在后台**：
+`/admin/settings` → 「音乐播放器」「看板娘（Live2D）」两个区块，保存后前台立即生效
+（存在 `settings` 表的 `site` 行里，与站点其它设置一起走缓存）。
 
 ### 🎵 音乐播放器
 
 | 文件 | 作用 |
 | --- | --- |
-| `src/config/music.ts` | 歌曲列表、音量、是否循环 / 随机 |
 | `src/hooks/use-audio-player.ts` | 播放状态机（单例 `HTMLAudioElement`，事件驱动，卸载时释放） |
 | `src/components/music-player/` | 播放器外壳、控制条、进度条、音量、歌单 |
+| `src/app/api/music/tracks/route.ts` | 曲目接口：本地列表，或服务端代拉网易云歌单 |
 
-加歌：
+两种来源（后台「曲目来源」切换）：
 
-1. 音频放 `public/music/tracks/`，封面放 `public/music/covers/`；
-2. 在 `musicConfig.tracks` 里追加 `{ id, title, artist, cover, url }`，`id` 保持唯一。
+1. **本地 / 直链**：后台的曲目框里一行一首，格式 `标题 | 歌手 | 封面地址 | 音频地址`；
+   音频放 `public/music/tracks/`，封面放 `public/music/covers/`。
+   注意 `public/` 是打进镜像的，换歌要重新 `docker compose up -d --build app`。
+   想免构建就填外部直链（如对象存储上的 mp3）。
+2. **网易云歌单（Meting）**：填 Meting 兼容接口地址 + 歌单 ID，例如
+   `https://api.injahow.cn/meting/` + `3778678`。前端请求 `/api/music/tracks`，
+   由服务端去拉 Meting（服务端缓存 10 分钟），避免浏览器跨域；接口不通时播放器里会显示错误原因。
+   Meting 接口有公共实例，也可以自建（`metowolf/Meting`），生产环境建议自建。
 
-播放器挂在布局里，前台切换路由不会中断播放；音量、循环方式、随机和当前曲目记在
-`localStorage`。默认不自动播放（浏览器会拦截），`autoplay` 保持 `false`。
+播放器挂在布局里，前台切换路由不会中断播放；音量、循环方式、随机和当前曲目记在 `localStorage`。
+默认不自动播放（浏览器会拦截），后台的「自动播放」保持关闭即可。
 
 ### 🧸 看板娘（Live2D）
 
 | 文件 | 作用 |
 | --- | --- |
-| `src/config/live2d.ts` | 模型路径、位置、尺寸、气泡文案、移动端策略 |
 | `src/components/live2d/live2d.tsx` | 加载运行时、挂载 / 销毁 [`l2d-widget`](https://github.com/hacxy/l2d-widget) 实例 |
+| `src/lib/live2d-models.ts` | 扫描 `public/live2d/models/` 下可用模型，供后台下拉选择 |
 | `public/vendor/l2d-widget.min.js` | 官方 IIFE 构建（自带 Cubism 2 / 4 运行时），约 644 KB，按需加载 |
 
-放模型：
+导入模型（不用改代码）：
 
-1. 模型放 `public/live2d/models/<名字>/`（`model.json` 或 `*.model3.json`，连同纹理、动作、物理文件）；
-2. 改 `live2dConfig.models[].path` 指向它；`models` 传多个时，悬浮菜单会自动出现切换按钮；
-3. 现在的默认值是库作者的演示模型（`https://model.hacxy.cn/cat-black/model.json`），
-   第一次打开就能看到效果，**正式使用请换成自己的本地模型**。
+1. 把整个模型文件夹放进 `public/live2d/models/<名字>/`，入口文件是 `model.json`（Cubism 2）
+   或 `xxx.model3.json`（Cubism 3/4），纹理 / 动作 / 物理文件放同一目录；
+2. 打开 `/admin/settings`，在「模型路径」输入框里会提示已发现的模型，选一个保存即可；
+3. 模型文件是随镜像走的静态资源，所以放进 `public/` 之后要重新构建镜像才会生效。
 
 关于运行时：不要改成 `import { createWidget } from "l2d-widget"`。该包的 ESM 产物在模块初始化阶段
 就读取 `Live2DCubismCore` 全局，经 webpack 生产构建压缩后这个读取会被提前到模块顶层，
@@ -333,12 +340,12 @@ cp node_modules/l2d-widget/dist/index.min.js public/vendor/l2d-widget.min.js
 
 行为说明：
 
-- 移动端默认不显示（`mobile.enabled: false`，阈值 `maxWidth`）；系统开启“减少动态效果”时也不显示；
+- 「手机端也显示」默认关闭；系统开启“减少动态效果”时始终不显示；
 - 模型文件不存在时直接跳过，不会在页面上留下“加载中”的半截 UI（开发环境控制台提示缺哪个文件）；
-- 运行时和模型都在 `loadDelayMs` 之后才加载，不进首屏；
-- 隐藏后点左下角的休息状态条即可唤醒，菜单里有“让她休息一下”。
+- 菜单/状态条强制不换行：图标（Iconify）加载不到时会退化成文字，不锁换行会被挤成竖排；
+- 运行时和模型都在页面空闲后才加载，不进首屏；隐藏后点左下角的休息条即可唤醒。
 
-关闭任一组件：把对应配置里的 `enabled` 改成 `false`。
+关闭任一组件：在后台把对应区块的勾选取消即可。
 `public/music` 与 `public/live2d` 下各有一份资源说明；模型和音乐请自行确认授权。
 
 ## 💾 数据备份

@@ -28,8 +28,8 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
         github={settings.githubUrl}
       />
       <BackToTop />
-      <MusicPlayer />
-      <Live2D />
+      <MusicPlayer settings={settings.music} />
+      <Live2D settings={settings.live2d} />
     </>
   );
 }

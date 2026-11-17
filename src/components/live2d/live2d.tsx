@@ -1,23 +1,25 @@
 "use client";
 
 import { useEffect } from "react";
-import type { ModelOptions, TipsOptions, Widget } from "l2d-widget";
-import { live2dConfig } from "@/config/live2d";
-import type { Live2DModel, Live2DTips } from "@/types/live2d";
+import type { ModelOptions, Widget } from "l2d-widget";
+import type { Live2DSettings } from "@/lib/settings";
 
 /**
  * 看板娘：运行时是 public/vendor/l2d-widget.min.js（官方 IIFE 构建）。
  *
  * 为什么不用 `import("l2d-widget")`：
  * 它的 ESM 产物在模块初始化阶段就读取 `Live2DCubismCore` 全局，经 webpack
- * 生产构建（压缩/常量折叠）后这个读取会被提前到模块顶层执行，没预加载
- * Cubism Core 时会直接抛 `ReferenceError: Live2DCubismCore is not defined`，
- * 而 dev 模式不压缩所以看不出来。IIFE 构建自带 Cubism 2 / 4 两份 Core，
- * 用 <script> 按需加载最稳，也符合它官方文档的接入方式。
+ * 生产构建压缩后这个读取会被提前到模块顶层执行，没预加载 Cubism Core 时会
+ * 直接抛 `ReferenceError: Live2DCubismCore is not defined`（dev 模式不压缩，
+ * 所以看不出来）。IIFE 构建自带 Cubism 2 / 4 两份 Core，用 <script> 按需加载最稳。
  */
 
 type WidgetGlobal = { createWidget: (options: unknown) => Widget };
 type WindowWithWidget = Window & { L2D_WIDGET?: WidgetGlobal };
+
+const BUNDLE_SRC = "/vendor/l2d-widget.min.js";
+const LOAD_DELAY_MS = 1600;
+const TRANSITION_MS = 900;
 
 /** 同一个运行时只加载一次；失败后允许下次重试 */
 let bundlePromise: Promise<WidgetGlobal | null> | null = null;
@@ -85,87 +87,61 @@ async function modelExists(path: string) {
   }
 }
 
-function toTipsOptions(tips: Live2DTips): TipsOptions {
-  return {
-    welcomeMessage: tips.welcome,
-    messages: tips.messages,
-    duration: tips.durationMs,
-    interval: tips.intervalMs,
-    typing: tips.typingSpeed
-      ? { speed: tips.typingSpeed, param: tips.mouthParam }
-      : undefined,
-  };
-}
-
-function toModelOptions(model: Live2DModel): ModelOptions {
-  const tips =
-    model.tips === false ? false : model.tips ? toTipsOptions(model.tips) : undefined;
-
-  return {
-    path: model.path,
-    scale: model.scale,
-    offset: model.offset,
-    tips,
-  };
-}
-
-export function Live2D() {
+export function Live2D({ settings }: { settings: Live2DSettings }) {
   useEffect(() => {
-    const config = live2dConfig;
-    if (!config.enabled || config.models.length === 0) return;
+    if (!settings.enabled || !settings.modelPath) return;
 
     // 移动端策略：关掉就完全不创建实例（也就不下载模型）
-    if (!config.mobile.enabled) {
-      if (window.matchMedia(`(max-width: ${config.mobile.maxWidth}px)`).matches) return;
-    }
-    if (
-      config.respectReducedMotion &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    ) {
-      return;
-    }
+    if (!settings.mobile && window.matchMedia("(max-width: 767px)").matches) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
     let disposed = false;
     let widget: Widget | null = null;
     let timer = 0;
 
     const boot = async () => {
-      const first = config.models[0];
-      if (!first) return;
-
-      if (!(await modelExists(first.path))) {
+      if (!(await modelExists(settings.modelPath))) {
         warnSetup(
-          `[live2d] 没有找到模型文件：${first.path}。` +
-            "把模型放进 public/live2d/models/，或在 src/config/live2d.ts 里改路径。",
+          `[live2d] 没有找到模型文件：${settings.modelPath}。` +
+            "把模型放进 public/live2d/models/，或在后台「看板娘」里改路径。",
         );
         return;
       }
 
-      const api = await loadWidgetBundle(config.bundleSrc);
+      const api = await loadWidgetBundle(BUNDLE_SRC);
       if (!api) {
-        warnFailure(`[live2d] 运行时加载失败：${config.bundleSrc}`);
+        warnFailure(`[live2d] 运行时加载失败：${BUNDLE_SRC}`);
         return;
       }
       if (disposed) return;
 
+      const model: ModelOptions = {
+        path: settings.modelPath,
+        scale: 1,
+        tips: {
+          welcomeMessage: settings.welcome.length ? settings.welcome : undefined,
+          messages: settings.messages.length ? settings.messages : undefined,
+          duration: 3200,
+          interval: 12000,
+          typing: { speed: 90 },
+        },
+      };
+
       try {
         widget = api.createWidget({
-          model: config.models.map(toModelOptions),
-          position: config.position,
-          size: config.size,
-          primaryColor: config.primaryColor,
-          transitionDuration: config.transitionDuration,
-          transitionType: config.transitionType,
-          menus: config.restMenuLabel
-            ? {
-                extraItems: [
-                  {
-                    label: config.restMenuLabel,
-                    onClick: (instance: Widget) => instance.sleep(),
-                  },
-                ],
-              }
-            : undefined,
+          model,
+          position: settings.position,
+          size: settings.size,
+          primaryColor: "rgba(76, 186, 155, 0.92)",
+          transitionDuration: TRANSITION_MS,
+          transitionType: "slide",
+          // 图标来自 Iconify，加载不到时会退化成文字；不锁住换行就会被挤成竖排
+          menus: {
+            style: { whiteSpace: "nowrap", fontSize: "12px", lineHeight: "1.4" },
+          },
+          statusBar: {
+            style: { whiteSpace: "nowrap", fontSize: "12px", lineHeight: "1.4" },
+          },
         });
       } catch (error) {
         warnFailure("[live2d] 看板娘初始化失败：", error);
@@ -175,7 +151,7 @@ export function Live2D() {
     // 延后加载：不让运行时的下载和首屏抢带宽
     timer = window.setTimeout(() => {
       void boot();
-    }, config.loadDelayMs);
+    }, LOAD_DELAY_MS);
 
     return () => {
       disposed = true;
@@ -185,7 +161,7 @@ export function Live2D() {
         widget = null;
       }
     };
-  }, []);
+  }, [settings]);
 
   return null;
 }

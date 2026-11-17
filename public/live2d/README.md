@@ -18,15 +18,8 @@ Cubism 3/4 模型用 `xxx.model3.json` 作为入口，同样放在这里，不�
 
 ## 换模型
 
-编辑 `src/config/live2d.ts`：
-
-```ts
-models: [
-  { path: "/live2d/models/character-01/model.json", scale: 1 },
-  // 传多个模型时，悬浮菜单里会自动出现切换按钮
-  // { path: "/live2d/models/character-02/model3.json" },
-],
-```
+编辑 `src/config/live2d.ts` → 现已改为后台设置：打开 `/admin/settings` →「看板娘（Live2D）」，
+「模型路径」会列出 `public/live2d/models/` 下扫描到的模型，选一个保存即可。
 
 默认配置指向库作者的演示模型（`https://model.hacxy.cn/cat-black/model.json`），
 换成自己的模型后不要依赖那个地址。

@@ -23,6 +23,7 @@ import {
 import { deleteMediaByKey } from "@/lib/media";
 import { scanMedia } from "@/lib/media-refs";
 import type { SiteSettings } from "@/lib/settings";
+import type { MusicTrack } from "@/types/music";
 import { countWords, estimateReadingTime } from "@/lib/utils";
 
 export type FormState = {
@@ -202,6 +203,30 @@ const SETTING_FIELDS = [
   "telegramUrl",
 ] as const;
 
+function toLines(value: string) {
+  return value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+/** 本地曲目：一行一首，格式 标题 | 歌手 | 封面地址 | 音频地址 */
+function parseMusicTracks(value: string): MusicTrack[] {
+  return toLines(value)
+    .map((line, index) => {
+      const [title, artist, cover, url] = line.split("|").map((part) => part.trim());
+      if (!url) return null;
+      return {
+        id: `local-${index}-${url.slice(-16)}`,
+        title: title || "未命名曲目",
+        artist: artist || "",
+        cover: cover || "",
+        url,
+      };
+    })
+    .filter((track): track is MusicTrack => Boolean(track));
+}
+
 export async function saveSettingsAction(formData: FormData): Promise<void> {
   const session = await guard();
   if (session.role !== "ADMIN") redirect("/admin/profile");
@@ -218,6 +243,31 @@ export async function saveSettingsAction(formData: FormData): Promise<void> {
     .filter(Boolean);
   if (heroImages.length) patch.heroImages = heroImages;
   patch.heroBeam = formData.get("heroBeam") === "on";
+
+  const musicVolume = Number(formData.get("musicVolume") ?? 0.7);
+  patch.music = {
+    enabled: formData.get("musicEnabled") === "on",
+    source: formData.get("musicSource") === "netease" ? "netease" : "local",
+    volume: Number.isFinite(musicVolume) ? Math.min(1, Math.max(0, musicVolume)) : 0.7,
+    autoplay: formData.get("musicAutoplay") === "on",
+    shuffle: formData.get("musicShuffle") === "on",
+    tracks: parseMusicTracks(String(formData.get("musicTracks") ?? "")),
+    netease: {
+      api: String(formData.get("neteaseApi") ?? "").trim(),
+      playlistId: String(formData.get("neteasePlaylistId") ?? "").trim(),
+    },
+  };
+
+  const live2dSize = Number(formData.get("live2dSize") ?? 280);
+  patch.live2d = {
+    enabled: formData.get("live2dEnabled") === "on",
+    modelPath: String(formData.get("live2dModelPath") ?? "").trim(),
+    position: formData.get("live2dPosition") === "bottom-right" ? "bottom-right" : "bottom-left",
+    size: Number.isFinite(live2dSize) ? Math.min(480, Math.max(160, live2dSize)) : 280,
+    mobile: formData.get("live2dMobile") === "on",
+    welcome: toLines(String(formData.get("live2dWelcome") ?? "")),
+    messages: toLines(String(formData.get("live2dMessages") ?? "")),
+  };
 
   await saveSettings(patch);
 

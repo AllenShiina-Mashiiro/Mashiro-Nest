@@ -7,6 +7,7 @@ import { MediaField } from "@/components/admin/media-field";
 import { MultiMediaField } from "@/components/admin/multi-media-field";
 import { StatusPicker } from "@/components/admin/status-picker";
 import { getPage, getSettings, listUsers } from "@/lib/data";
+import { listLive2dModels } from "@/lib/live2d-models";
 
 export const dynamic = "force-dynamic";
 
@@ -26,10 +27,11 @@ export default async function SettingsPage({
   const session = await getSession();
   if (session?.role !== "ADMIN") redirect("/admin");
 
-  const [settings, about, users] = await Promise.all([
+  const [settings, about, users, live2dModels] = await Promise.all([
     getSettings(),
     getPage("about"),
     listUsers(),
+    listLive2dModels(),
   ]);
   const owner = users.find((user) => user.role === "ADMIN") ?? users[0] ?? null;
 
@@ -264,6 +266,197 @@ export default async function SettingsPage({
           <p className="flex items-start gap-1.5 text-[10.5px] leading-relaxed text-ink-400">
             <Sparkles className="mt-0.5 h-3 w-3 shrink-0" />
             关于页顶部复用首页的背景图区域，位置信息取自站长资料。
+          </p>
+        </section>
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <section className="space-y-3 rounded-2xl border border-ink-100 bg-white/80 p-4 dark:border-white/8 dark:bg-white/[0.04]">
+          <h2 className="section-title">音乐播放器</h2>
+          <label className="flex items-center gap-2 text-[11.5px] text-ink-500 dark:text-ink-300">
+            <input
+              type="checkbox"
+              name="musicEnabled"
+              defaultChecked={settings.music.enabled}
+              className="h-3.5 w-3.5 accent-mint-500"
+            />
+            在前台显示播放器
+          </label>
+
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-semibold text-ink-400">曲目来源</span>
+              <select
+                name="musicSource"
+                defaultValue={settings.music.source}
+                className="w-full rounded-xl border border-ink-200/80 bg-white/70 px-2.5 py-2 text-[11.5px] outline-none focus:border-mint-300 dark:border-white/10 dark:bg-white/5 dark:text-white/90"
+              >
+                <option value="local">本地 / 直链</option>
+                <option value="netease">网易云歌单（Meting）</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-semibold text-ink-400">初始音量（0~1）</span>
+              <input
+                type="number"
+                name="musicVolume"
+                min={0}
+                max={1}
+                step={0.05}
+                defaultValue={settings.music.volume}
+                className="w-full rounded-xl border border-ink-200/80 bg-white/70 px-2.5 py-2 text-[11.5px] outline-none focus:border-mint-300 dark:border-white/10 dark:bg-white/5 dark:text-white/90"
+              />
+            </label>
+          </div>
+
+          <div className="flex flex-wrap gap-4">
+            <label className="flex items-center gap-2 text-[11.5px] text-ink-500 dark:text-ink-300">
+              <input
+                type="checkbox"
+                name="musicAutoplay"
+                defaultChecked={settings.music.autoplay}
+                className="h-3.5 w-3.5 accent-mint-500"
+              />
+              自动播放（多数浏览器会拦截）
+            </label>
+            <label className="flex items-center gap-2 text-[11.5px] text-ink-500 dark:text-ink-300">
+              <input
+                type="checkbox"
+                name="musicShuffle"
+                defaultChecked={settings.music.shuffle}
+                className="h-3.5 w-3.5 accent-mint-500"
+              />
+              默认随机播放
+            </label>
+          </div>
+
+          <label className="block">
+            <span className="mb-1 block text-[11px] font-semibold text-ink-400">
+              本地曲目（一行一首：标题 | 歌手 | 封面地址 | 音频地址）
+            </span>
+            <textarea
+              name="musicTracks"
+              rows={5}
+              defaultValue={settings.music.tracks
+                .map((track) => [track.title, track.artist, track.cover, track.url].join(" | "))
+                .join("\n")}
+              placeholder="风铃 | Mashiro Nest | /music/covers/demo.svg | /music/tracks/demo-chime.wav"
+              className="w-full resize-y rounded-xl border border-ink-200/80 bg-white/70 px-2.5 py-2 font-mono text-[11px] leading-relaxed outline-none focus:border-mint-300 dark:border-white/10 dark:bg-white/5 dark:text-white/90"
+            />
+          </label>
+
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-semibold text-ink-400">Meting 接口地址</span>
+              <input
+                name="neteaseApi"
+                defaultValue={settings.music.netease.api}
+                placeholder="https://api.injahow.cn/meting/"
+                className="w-full rounded-xl border border-ink-200/80 bg-white/70 px-2.5 py-2 text-[11px] outline-none focus:border-mint-300 dark:border-white/10 dark:bg-white/5 dark:text-white/90"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-semibold text-ink-400">网易云歌单 ID</span>
+              <input
+                name="neteasePlaylistId"
+                defaultValue={settings.music.netease.playlistId}
+                placeholder="歌单链接里 id= 后面那串数字"
+                className="w-full rounded-xl border border-ink-200/80 bg-white/70 px-2.5 py-2 text-[11px] outline-none focus:border-mint-300 dark:border-white/10 dark:bg-white/5 dark:text-white/90"
+              />
+            </label>
+          </div>
+          <p className="flex items-start gap-1.5 text-[10.5px] leading-relaxed text-ink-400">
+            <Sparkles className="mt-0.5 h-3 w-3 shrink-0" />
+            选「网易云歌单」后，服务端会向 Meting 接口请求歌单并缓存 10 分钟；接口不通时播放器会显示错误提示。
+          </p>
+        </section>
+
+        <section className="space-y-3 rounded-2xl border border-ink-100 bg-white/80 p-4 dark:border-white/8 dark:bg-white/[0.04]">
+          <h2 className="section-title">看板娘（Live2D）</h2>
+          <label className="flex items-center gap-2 text-[11.5px] text-ink-500 dark:text-ink-300">
+            <input
+              type="checkbox"
+              name="live2dEnabled"
+              defaultChecked={settings.live2d.enabled}
+              className="h-3.5 w-3.5 accent-mint-500"
+            />
+            在前台显示看板娘
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-[11px] font-semibold text-ink-400">模型路径</span>
+            <input
+              name="live2dModelPath"
+              list="live2d-model-options"
+              defaultValue={settings.live2d.modelPath}
+              placeholder="/live2d/models/character-01/model.json"
+              className="w-full rounded-xl border border-ink-200/80 bg-white/70 px-2.5 py-2 font-mono text-[11px] outline-none focus:border-mint-300 dark:border-white/10 dark:bg-white/5 dark:text-white/90"
+            />
+            <datalist id="live2d-model-options">
+              {live2dModels.map((model) => (
+                <option key={model.path} value={model.path}>
+                  {model.name}（{model.format === "cubism4" ? "Cubism 3/4" : "Cubism 2"}）
+                </option>
+              ))}
+            </datalist>
+          </label>
+
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-semibold text-ink-400">显示位置</span>
+              <select
+                name="live2dPosition"
+                defaultValue={settings.live2d.position}
+                className="w-full rounded-xl border border-ink-200/80 bg-white/70 px-2.5 py-2 text-[11.5px] outline-none focus:border-mint-300 dark:border-white/10 dark:bg-white/5 dark:text-white/90"
+              >
+                <option value="bottom-left">左下角</option>
+                <option value="bottom-right">右下角</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-semibold text-ink-400">尺寸（px）</span>
+              <input
+                type="number"
+                name="live2dSize"
+                min={160}
+                max={480}
+                step={20}
+                defaultValue={settings.live2d.size}
+                className="w-full rounded-xl border border-ink-200/80 bg-white/70 px-2.5 py-2 text-[11.5px] outline-none focus:border-mint-300 dark:border-white/10 dark:bg-white/5 dark:text-white/90"
+              />
+            </label>
+          </div>
+
+          <label className="flex items-center gap-2 text-[11.5px] text-ink-500 dark:text-ink-300">
+            <input
+              type="checkbox"
+              name="live2dMobile"
+              defaultChecked={settings.live2d.mobile}
+              className="h-3.5 w-3.5 accent-mint-500"
+            />
+            手机端也显示
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-[11px] font-semibold text-ink-400">欢迎语（一行一条，随机显示）</span>
+            <textarea
+              name="live2dWelcome"
+              rows={2}
+              defaultValue={settings.live2d.welcome.join("\n")}
+              className="w-full resize-y rounded-xl border border-ink-200/80 bg-white/70 px-2.5 py-2 text-[11.5px] outline-none focus:border-mint-300 dark:border-white/10 dark:bg-white/5 dark:text-white/90"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-[11px] font-semibold text-ink-400">循环提示语（一行一条）</span>
+            <textarea
+              name="live2dMessages"
+              rows={3}
+              defaultValue={settings.live2d.messages.join("\n")}
+              className="w-full resize-y rounded-xl border border-ink-200/80 bg-white/70 px-2.5 py-2 text-[11.5px] outline-none focus:border-mint-300 dark:border-white/10 dark:bg-white/5 dark:text-white/90"
+            />
+          </label>
+          <p className="flex items-start gap-1.5 text-[10.5px] leading-relaxed text-ink-400">
+            <Sparkles className="mt-0.5 h-3 w-3 shrink-0" />
+            把模型文件夹放进 public/live2d/models/ 后刷新本页，路径框会自动提示可选模型；Cubism 2 / 3 / 4 都支持。
           </p>
         </section>
       </div>

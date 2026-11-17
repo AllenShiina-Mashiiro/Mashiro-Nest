@@ -1,8 +1,9 @@
 "use client";
 
 import { AlertCircle, Disc3, ListMusic, Music, X } from "lucide-react";
-import { useEffect, useState } from "react";
-import { musicConfig } from "@/config/music";
+import { useEffect, useMemo, useState } from "react";
+import type { MusicSettings } from "@/lib/settings";
+import type { MusicTrack } from "@/types/music";
 import { useAudioPlayer } from "@/hooks/use-audio-player";
 import { PlayerControls } from "@/components/music-player/player-controls";
 import { Playlist } from "@/components/music-player/playlist";
@@ -12,14 +13,47 @@ import { VolumeControl } from "@/components/music-player/volume-control";
 /**
  * 网页音乐播放器：挂在 (site) 布局里，App Router 的布局在客户端导航时不会重新挂载，
  * 所以切页面能继续播放，且全程只有一个 audio 实例。
+ * 曲目来源由后台设置决定：本地列表，或服务端代拉的网易云歌单。
  */
-export function MusicPlayer() {
+export function MusicPlayer({ settings }: { settings: MusicSettings }) {
+  const [remote, setRemote] = useState<MusicTrack[] | null>(null);
+  const [remoteError, setRemoteError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!settings.enabled || settings.source !== "netease") return;
+    let cancelled = false;
+
+    void fetch("/api/music/tracks")
+      .then(async (response) => {
+        const payload = (await response.json()) as {
+          tracks?: MusicTrack[];
+          error?: string | null;
+        };
+        if (cancelled) return;
+        setRemote(Array.isArray(payload.tracks) ? payload.tracks : []);
+        setRemoteError(payload.error ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setRemoteError("歌单加载失败，请检查后台的 Meting 接口设置");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [settings.enabled, settings.source]);
+
+  const tracks = useMemo<MusicTrack[]>(() => {
+    if (!settings.enabled) return [];
+    if (settings.source === "netease") return remote ?? [];
+    return settings.tracks;
+  }, [remote, settings.enabled, settings.source, settings.tracks]);
+
   const player = useAudioPlayer({
-    tracks: musicConfig.tracks,
-    autoplay: musicConfig.autoplay,
-    loop: musicConfig.loop,
-    shuffle: musicConfig.shuffle,
-    volume: musicConfig.volume,
+    tracks,
+    autoplay: settings.autoplay,
+    loop: true,
+    shuffle: settings.shuffle,
+    volume: settings.volume,
   });
 
   const [open, setOpen] = useState(false);
@@ -39,9 +73,10 @@ export function MusicPlayer() {
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
-  if (!musicConfig.enabled || !player.track) return null;
+  if (!settings.enabled || !player.track) return null;
 
   const track = player.track;
+  const error = remoteError ?? player.error;
 
   return (
     <div className="fixed bottom-20 right-4 z-50 flex flex-col items-end gap-2 sm:right-6">
@@ -133,10 +168,10 @@ export function MusicPlayer() {
             />
           ) : null}
 
-          {player.error ? (
+          {error ? (
             <p className="mt-2 flex items-start gap-1.5 rounded-xl bg-amber-50 px-2.5 py-1.5 text-[10.5px] leading-relaxed text-amber-700 dark:bg-amber-400/10 dark:text-amber-300">
               <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
-              {player.error}
+              {error}
             </p>
           ) : null}
         </section>
