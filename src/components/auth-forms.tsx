@@ -30,20 +30,10 @@ function Field({
   );
 }
 
-export function LoginForm({
-  redirectTo = "/",
-  demo,
-  demoEmail,
-  demoPassword,
-}: {
-  redirectTo?: string;
-  demo?: boolean;
-  demoEmail?: string;
-  demoPassword?: string;
-}) {
+export function LoginForm({ redirectTo = "/" }: { redirectTo?: string }) {
   const router = useRouter();
-  const [email, setEmail] = useState(demo ? (demoEmail ?? "") : "");
-  const [password, setPassword] = useState(demo ? (demoPassword ?? "") : "");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -109,11 +99,6 @@ export function LoginForm({
         登录
       </button>
 
-      {demo ? (
-        <p className="rounded-xl bg-mint-50 px-3 py-2 text-[11px] leading-relaxed text-mint-600 dark:bg-mint-400/10 dark:text-mint-300">
-          演示账号 <b>{demoEmail}</b> / <b>{demoPassword}</b>
-        </p>
-      ) : null}
     </form>
   );
 }
