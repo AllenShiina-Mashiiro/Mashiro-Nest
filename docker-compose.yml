@@ -1,8 +1,12 @@
 # Production-ready single-instance stack.
 # 1) Copy .env.example to .env and set unique passwords/secrets.
-# 2) docker compose up -d --build
-# 3) docker compose exec app npm run db:push
-# 4) docker compose exec app npm run db:seed
+# 2) Start the database services: docker compose up -d db redis
+# 3) Initialize the schema: docker compose --profile tools run --rm --build db-tools
+# 4) Create the administrator: docker compose --profile tools run --rm db-tools npm run db:admin
+# 5) Start the web app: docker compose up -d --build app
+#
+# Optional demo content:
+# docker compose --profile tools run --rm db-tools npm run db:seed
 #
 # PostgreSQL and Redis ports are bound to localhost only. Put the app behind
 # an HTTPS reverse proxy (Caddy, Nginx, Traefik, etc.) in production.
@@ -51,6 +55,24 @@ services:
       start_period: 40s
     security_opt:
       - no-new-privileges:true
+
+  # One-off maintenance container. It includes Prisma CLI and tsx from devDependencies,
+  # but is excluded from the default `docker compose up` because it uses a profile.
+  db-tools:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: db-tools
+    image: mashiro-nest-tools:latest
+    profiles: ["tools"]
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-mashiro}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-mashiro}?schema=public
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
 
   db:
     image: postgres:16-alpine
