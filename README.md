@@ -382,3 +382,13 @@ cat mashiro-backup.dump | docker compose exec -T db pg_restore -U mashiro -d mas
 <p align="center">
   🌸 Made with care · Mashiro Nest
 </p>
+
+---
+
+## 📄 License
+
+Copyright © 2026 AllenShiina-Mashiiro
+
+This project is licensed under the MIT License.
+
+See the [LICENSE](LICENSE) file for details.
